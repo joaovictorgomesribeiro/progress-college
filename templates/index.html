@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Meu Sistema de Estudos</title>
+<meta name="theme-color" content="#6366f1">
+<script>
+  (function () {
+    try {
+      var t = localStorage.getItem("tema");
+      if (t === "claro") document.documentElement.setAttribute("data-theme", "light");
+      else if (t === "escuro") document.documentElement.setAttribute("data-theme", "dark");
+    } catch (e) {}
+  })();
+</script>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/responsive.css') }}">
+</head>
+<body>
+<div id="app-shell">
+  <header id="topbar">
+    <div class="brand">📚 <span>Meu Sistema de Estudos</span></div>
+    <div class="actions">
+      <button id="theme-toggle" class="icon-btn" type="button" aria-label="Alternar tema">🌙</button>
+    </div>
+  </header>
+
+  <div id="layout">
+    <nav id="sidebar" aria-label="Navegação principal">
+      <div class="brand">📚 <span class="brand-text">Estudos</span></div>
+      <div id="sidebar-items"></div>
+    </nav>
+
+    <main id="view" role="main"></main>
+  </div>
+
+  <nav id="bottom-nav" aria-label="Navegação principal"></nav>
+  <button id="fab" type="button" aria-label="Adicionar" hidden>+</button>
+</div>
+
+<div id="modal-root" hidden aria-hidden="true"></div>
+<div id="toast" role="status" aria-live="polite"></div>
+
+<input type="file" id="import-file-input" accept=".xlsx" hidden>
+
+<script src="{{ url_for('static', filename='js/api.js') }}"></script>
+<script src="{{ url_for('static', filename='js/app.js') }}"></script>
+<script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+<script src="{{ url_for('static', filename='js/disciplinas.js') }}"></script>
+<script src="{{ url_for('static', filename='js/avaliacoes.js') }}"></script>
+<script src="{{ url_for('static', filename='js/tarefas.js') }}"></script>
+<script src="{{ url_for('static', filename='js/calendario.js') }}"></script>
+<script src="{{ url_for('static', filename='js/estudos.js') }}"></script>
+<script src="{{ url_for('static', filename='js/pomodoro.js') }}"></script>
+<script src="{{ url_for('static', filename='js/estatisticas.js') }}"></script>
+<script src="{{ url_for('static', filename='js/grade.js') }}"></script>
+</body>
+</html>

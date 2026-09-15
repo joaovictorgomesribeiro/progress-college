@@ -1,0 +1,59 @@
+/* Meu Sistema de Estudos - breakpoints
+   Mobile 320+ (default) | Tablet 768+ | Desktop 1024+ | Desktop grande 1440+ */
+
+/* ===== Tablet: 768px+ ===== */
+@media (min-width: 768px) {
+  #bottom-nav { display: none; }
+  #fab { display: none; }
+
+  #sidebar {
+    display: flex;
+    width: 76px;
+    align-items: center;
+  }
+  #sidebar .brand span.brand-text { display: none; }
+  #sidebar .nav-item { justify-content: center; padding: 12px 0; width: 52px; }
+  #sidebar .nav-item .nav-label { display: none; }
+
+  .container { padding: 20px 24px; padding-bottom: 32px; }
+  .stat-grid { grid-template-columns: repeat(3, 1fr); }
+  .cards-grid { grid-template-columns: repeat(2, 1fr); }
+  .view-toggle { display: flex; }
+  #topbar { padding-left: 24px; padding-right: 24px; }
+}
+
+/* ===== Desktop: 1024px+ ===== */
+@media (min-width: 1024px) {
+  #sidebar {
+    width: 240px;
+    align-items: stretch;
+  }
+  #sidebar .brand span.brand-text { display: inline; }
+  #sidebar .nav-item {
+    justify-content: flex-start;
+    width: auto;
+    padding: 12px 14px;
+  }
+  #sidebar .nav-item .nav-label { display: inline; }
+
+  .stat-grid { grid-template-columns: repeat(4, 1fr); }
+  .cards-grid { grid-template-columns: repeat(3, 1fr); }
+  .container { max-width: 1180px; }
+}
+
+/* ===== Desktop grande: 1440px+ ===== */
+@media (min-width: 1440px) {
+  .cards-grid { grid-template-columns: repeat(4, 1fr); }
+  .container { max-width: 1320px; }
+}
+
+/* ===== Tabelas -> cards no mobile (helper genérico) ===== */
+@media (max-width: 767px) {
+  .table-only { display: none; }
+}
+@media (min-width: 768px) {
+  .cards-only { display: none; }
+}
+
+/* Evita scroll horizontal indesejado */
+.scroll-x { overflow-x: auto; -webkit-overflow-scrolling: touch; }
