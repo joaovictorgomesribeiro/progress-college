@@ -58,7 +58,7 @@ Acesse `http://127.0.0.1:5000`. O banco `database.db` é criado e as tabelas ini
 
 4. **Instalar as dependências**
    ```bash
-   pip install -r requirements.txt
+      
    ```
 
 5. **Configurar o arquivo WSGI**
@@ -90,18 +90,7 @@ Acesse `http://127.0.0.1:5000`. O banco `database.db` é criado e as tabelas ini
 9. **Recarregar**
    - Clique em **Reload** na aba **Web** do PythonAnywhere e acesse `https://seuusuario.pythonanywhere.com`.
 
-## Primeira utilização
-
-O XLSX **nunca é obrigatório**. Com o banco vazio, todas as páginas funcionam normalmente e mostram seus próprios estados vazios com um botão de cadastro (ex.: "+ Nova matéria", "+ Nova tarefa"). Na primeira vez que o sistema é aberto sem nenhum dado, o Dashboard mostra uma tela de boas-vindas com duas opções: **+ Começar a cadastrar** (cadastro manual, direto na página de Matérias) ou **📥 Importar XLSX** (leva à página de Configurações, onde é possível enviar um `.xlsx` no formato descrito abaixo). Assim que a primeira matéria é cadastrada — manualmente ou via planilha — o Dashboard passa a mostrar o painel normal.
-
-### Preparado para um futuro Catálogo Acadêmico
-
-O banco já possui uma tabela `disciplinas_catalogo` (vazia, sem nenhuma tela associada ainda) e a tabela `disciplinas` tem uma coluna opcional `catalogo_disciplina_id`. Isso permite que, no futuro, uma disciplina cadastrada pelo usuário aponte para um registro oficial do catálogo — sem exigir nenhuma migração de dados e sem alterar o cadastro manual, que continua sendo a forma principal de adicionar disciplinas.
-
-### Formato da planilha XLSX
-
-Abas esperadas: `Disciplinas`, `Avaliações`, `Tarefas`, `Conteúdos`, `Estudos`, `Grade_Curricular`, `Metas`, `Config`. Colunas por aba estão documentadas em `xlsx_io.py`.
-
+dias
 Modos de importação:
 - **Adicionar**: só insere o que ainda não existe.
 - **Atualizar**: insere novos registros e atualiza os existentes (identificados por nome/código/título).

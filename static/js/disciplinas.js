@@ -161,6 +161,11 @@ async function abrirFormDisciplina(disciplina = null) {
           <div class="field"><label for="f-creditos">Créditos</label><input id="f-creditos" type="number" value="${disciplina?.creditos ?? ""}"></div>
         </div>
         <div class="field"><label for="f-sala">Sala</label><input id="f-sala" value="${disciplina?.sala || ""}"></div>
+        <div class="field">
+          <label>Horários de aula</label>
+          <div id="f-horarios-list"></div>
+          <button type="button" class="btn btn-sm" id="btn-add-horario">${icon("plus")} Adicionar horário</button>
+        </div>
         <div class="field"><label for="f-status">Status</label>
           <select id="f-status">
             ${Object.entries(STATUS_DISC_LABEL).map(([v, l]) => `<option value="${v}" ${disciplina?.status === v ? "selected" : ""}>${l}</option>`).join("")}
@@ -183,6 +188,15 @@ async function abrirFormDisciplina(disciplina = null) {
     `,
   });
 
+  const horariosState = (disciplina?.horarios || []).map((h) => ({
+    dia_semana: h.dia_semana, hora_inicio: h.hora_inicio || "", hora_fim: h.hora_fim || "",
+  }));
+  renderHorariosRows(horariosState);
+  document.getElementById("btn-add-horario").addEventListener("click", () => {
+    horariosState.push({ dia_semana: 1, hora_inicio: "", hora_fim: "" });
+    renderHorariosRows(horariosState);
+  });
+
   document.getElementById("btn-salvar-disciplina").addEventListener("click", async () => {
     const dados = {
       nome: document.getElementById("f-nome").value.trim(),
@@ -198,6 +212,7 @@ async function abrirFormDisciplina(disciplina = null) {
       cor: document.getElementById("f-cor").value,
       observacoes: document.getElementById("f-obs").value.trim(),
       pre_requisitos: Array.from(document.getElementById("f-prereq").selectedOptions).map((o) => o.value),
+      horarios: horariosState.filter((h) => h.hora_inicio && h.hora_fim),
     };
     if (!dados.nome) { UI.showToast("Informe o nome da matéria."); return; }
     try {
@@ -221,6 +236,34 @@ async function abrirFormDisciplina(disciplina = null) {
       } catch (e) { UI.showToast(e.message); }
     });
   }
+}
+
+function renderHorariosRows(horariosState) {
+  const el = document.getElementById("f-horarios-list");
+  el.innerHTML = horariosState.length ? horariosState.map((h, i) => `
+    <div class="field-row" style="align-items:flex-end; margin-bottom:8px;">
+      <div class="field"><label>Dia</label>
+        <select data-h-dia="${i}">${DIAS_SEMANA.map((nome, v) => `<option value="${v}" ${h.dia_semana === v ? "selected" : ""}>${nome}</option>`).join("")}</select>
+      </div>
+      <div class="field"><label>Início</label><input type="time" data-h-inicio="${i}" value="${h.hora_inicio}"></div>
+      <div class="field"><label>Fim</label><input type="time" data-h-fim="${i}" value="${h.hora_fim}"></div>
+      <button type="button" class="icon-btn" data-h-remover="${i}" aria-label="Remover horário">${icon("x")}</button>
+    </div>
+  `).join("") : `<p class="field-hint" style="margin:0 0 8px;">Nenhum horário adicionado.</p>`;
+
+  el.querySelectorAll("[data-h-dia]").forEach((s) => s.addEventListener("change", () => {
+    horariosState[+s.dataset.hDia].dia_semana = +s.value;
+  }));
+  el.querySelectorAll("[data-h-inicio]").forEach((i) => i.addEventListener("change", () => {
+    horariosState[+i.dataset.hInicio].hora_inicio = i.value;
+  }));
+  el.querySelectorAll("[data-h-fim]").forEach((i) => i.addEventListener("change", () => {
+    horariosState[+i.dataset.hFim].hora_fim = i.value;
+  }));
+  el.querySelectorAll("[data-h-remover]").forEach((b) => b.addEventListener("click", () => {
+    horariosState.splice(+b.dataset.hRemover, 1);
+    renderHorariosRows(horariosState);
+  }));
 }
 
 /* ---------- Detalhe da disciplina ---------- */

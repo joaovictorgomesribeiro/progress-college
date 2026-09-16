@@ -35,6 +35,14 @@ registerPage("dashboard", {
         <div class="stat-item"><span class="stat-value">${tarefasPendentes}</span><span class="stat-label">tarefas pendentes</span></div>
         <div class="stat-item"><span class="stat-value">${dash.avaliacoes_proximas}</span><span class="stat-label">avaliações próximas</span></div>
         <div class="stat-item"><span class="stat-value">${dash.horas_semana}h</span><span class="stat-label">estudadas essa semana</span></div>
+        <div class="stat-item"><span class="stat-value">${dash.disciplinas_andamento}</span><span class="stat-label">matérias matriculadas</span></div>
+      </div>
+
+      <div class="section">
+        <div class="section-header"><h2>Aulas de hoje</h2></div>
+        <div class="list">
+          ${dash.aulas_hoje.length ? dash.aulas_hoje.map(aulaRow).join("") : `<p class="empty-state" style="padding:var(--space-4) 0;">Nenhuma aula cadastrada para hoje.</p>`}
+        </div>
       </div>
 
       <div class="section">
@@ -94,6 +102,17 @@ function tarefaRow(f) {
       <div class="list-row-sub">${f.subtitulo}</div>
     </div>
     <div class="list-row-meta">${f.detalhe}</div>
+  </div>`;
+}
+
+function aulaRow(a) {
+  return `<div class="list-row" data-goto="#/disciplinas/${a.disciplina_id}">
+    <span class="dot" style="background:${a.cor || "var(--text-faint)"}"></span>
+    <div class="list-row-main">
+      <div class="list-row-title">${a.disciplina_nome}</div>
+      <div class="list-row-sub">${a.sala ? "Sala " + a.sala : "Sem sala definida"}</div>
+    </div>
+    <div class="list-row-meta">${a.hora_inicio || ""}${a.hora_fim ? " - " + a.hora_fim : ""}</div>
   </div>`;
 }
 

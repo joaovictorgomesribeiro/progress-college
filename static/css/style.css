@@ -363,9 +363,9 @@ main#view { flex: 1; }
 
 /* ---------- Estatísticas rápidas (linha, não cards) ---------- */
 .stat-line {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-5);
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: var(--space-4) var(--space-5);
   padding: var(--space-4) 0;
   border-top: 1px solid var(--border);
   border-bottom: 1px solid var(--border);

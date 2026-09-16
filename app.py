@@ -754,13 +754,23 @@ def dashboard():
     tarefas_total = query_one("SELECT COUNT(*) AS n FROM tarefas")["n"]
     avaliacoes_proximas = query_one(
         "SELECT COUNT(*) AS n FROM avaliacoes WHERE status = 'pendente' AND data BETWEEN ? AND ?",
-        (hoje.isoformat(), (hoje + timedelta(days=7)).isoformat()),
+        (hoje.isoformat(), (hoje + timedelta(days=15)).isoformat()),
     )["n"]
     inicio_semana = (hoje - timedelta(days=hoje.weekday())).isoformat()
     minutos_semana = query_one(
         "SELECT COALESCE(SUM(duracao_min), 0) AS total FROM sessoes_estudo WHERE data >= ?",
         (inicio_semana,),
     )["total"]
+
+    dia_semana_hoje = (hoje.weekday() + 1) % 7  # weekday() é 0=segunda; horarios usa 0=domingo
+    aulas_hoje = query_all(
+        """SELECT h.hora_inicio, h.hora_fim, d.id AS disciplina_id, d.nome AS disciplina_nome,
+                  d.sala, d.professor, d.cor
+           FROM horarios h JOIN disciplinas d ON d.id = h.disciplina_id
+           WHERE h.dia_semana = ?
+           ORDER BY h.hora_inicio""",
+        (dia_semana_hoje,),
+    )
 
     foco = []
 
@@ -820,6 +830,7 @@ def dashboard():
         "tarefas_total": tarefas_total,
         "avaliacoes_proximas": avaliacoes_proximas,
         "horas_semana": round(minutos_semana / 60.0, 1),
+        "aulas_hoje": aulas_hoje,
         "foco_do_dia": foco[:8],
         "tem_dados": total_disciplinas > 0,
     })
