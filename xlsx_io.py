@@ -69,14 +69,24 @@ def _sheet_to_dicts(ws):
     return result
 
 
-def _find_disciplina_id(conn, nome_ou_codigo):
+def _carregar_mapa_disciplinas(conn, usuario_id):
+    """Pré-carrega {codigo/nome -> id} das disciplinas do usuário numa única
+    consulta, para que as demais abas (avaliações, tarefas, conteúdos...) não
+    precisem de um SELECT por linha da planilha para resolver a disciplina."""
+    mapa = {}
+    for row in conn.execute(
+        "SELECT id, nome, codigo FROM disciplinas WHERE usuario_id = ?", (usuario_id,)
+    ).fetchall():
+        if row["codigo"]:
+            mapa[str(row["codigo"])] = row["id"]
+        mapa[str(row["nome"])] = row["id"]
+    return mapa
+
+
+def _find_disciplina_id(mapa, nome_ou_codigo):
     if not nome_ou_codigo:
         return None
-    row = conn.execute(
-        "SELECT id FROM disciplinas WHERE codigo = ? OR nome = ? LIMIT 1",
-        (str(nome_ou_codigo), str(nome_ou_codigo)),
-    ).fetchone()
-    return row["id"] if row else None
+    return mapa.get(str(nome_ou_codigo))
 
 
 def validar_arquivo(file_storage):
@@ -94,11 +104,14 @@ def validar_arquivo(file_storage):
     return True, None
 
 
-def importar_xlsx(caminho_arquivo, modo="update"):
+def importar_xlsx(caminho_arquivo, modo, usuario_id):
     """modo: 'add' (só insere o que não existe), 'update' (upsert),
-    'replace' (limpa todas as tabelas de dados e insere do zero)."""
+    'replace' (limpa os dados desse usuário e insere do zero).
+    Toda a importação é isolada a usuario_id - nunca afeta dados de outra conta."""
     if modo not in ("add", "update", "replace"):
         raise ValueError("Modo de importação inválido.")
+    if not usuario_id:
+        raise ValueError("Usuário inválido.")
 
     wb = load_workbook(caminho_arquivo, data_only=True)
     conn = get_connection()
@@ -106,32 +119,40 @@ def importar_xlsx(caminho_arquivo, modo="update"):
 
     try:
         if modo == "replace":
-            for tabela in [
-                "pre_requisitos", "horarios", "avaliacoes", "tarefas", "conteudos",
-                "sessoes_estudo", "metas", "grade_curricular", "disciplinas",
-                "configuracoes",
-            ]:
-                conn.execute(f"DELETE FROM {tabela}")
+            # Apaga só os dados do usuário atual. avaliacoes/conteudos/horarios/
+            # pre_requisitos/grade_curricular somem sozinhos via ON DELETE CASCADE
+            # ao apagar as disciplinas do usuário. "configuracoes" é global e
+            # não é tocada aqui.
+            conn.execute("DELETE FROM tarefas WHERE usuario_id = ?", (usuario_id,))
+            conn.execute("DELETE FROM sessoes_estudo WHERE usuario_id = ?", (usuario_id,))
+            conn.execute("DELETE FROM metas WHERE usuario_id = ?", (usuario_id,))
+            conn.execute("DELETE FROM disciplinas WHERE usuario_id = ?", (usuario_id,))
+
+        # Mapa {codigo/nome -> id} das disciplinas do usuário, carregado uma
+        # única vez e mantido atualizado conforme novas disciplinas entram -
+        # evita 1 SELECT por linha de planilha nas abas que referenciam
+        # disciplina por nome/código (avaliações, tarefas, conteúdos, etc).
+        mapa_disciplinas = _carregar_mapa_disciplinas(conn, usuario_id)
 
         # 1) Disciplinas primeiro (outras tabelas dependem dela)
         if SHEET_DISCIPLINAS in wb.sheetnames:
-            _importar_disciplinas(conn, wb[SHEET_DISCIPLINAS], modo, resumo)
+            _importar_disciplinas(conn, wb[SHEET_DISCIPLINAS], modo, resumo, usuario_id, mapa_disciplinas)
 
         # 2) Grade curricular (associa período às disciplinas já existentes)
         if SHEET_GRADE in wb.sheetnames:
-            _importar_grade(conn, wb[SHEET_GRADE], modo, resumo)
+            _importar_grade(conn, wb[SHEET_GRADE], modo, resumo, mapa_disciplinas)
 
         # 3) Demais tabelas dependentes de disciplina
         if SHEET_AVALIACOES in wb.sheetnames:
-            _importar_avaliacoes(conn, wb[SHEET_AVALIACOES], modo, resumo)
+            _importar_avaliacoes(conn, wb[SHEET_AVALIACOES], modo, resumo, mapa_disciplinas)
         if SHEET_TAREFAS in wb.sheetnames:
-            _importar_tarefas(conn, wb[SHEET_TAREFAS], modo, resumo)
+            _importar_tarefas(conn, wb[SHEET_TAREFAS], modo, resumo, usuario_id, mapa_disciplinas)
         if SHEET_CONTEUDOS in wb.sheetnames:
-            _importar_conteudos(conn, wb[SHEET_CONTEUDOS], modo, resumo)
+            _importar_conteudos(conn, wb[SHEET_CONTEUDOS], modo, resumo, mapa_disciplinas)
         if SHEET_ESTUDOS in wb.sheetnames:
-            _importar_estudos(conn, wb[SHEET_ESTUDOS], modo, resumo)
+            _importar_estudos(conn, wb[SHEET_ESTUDOS], modo, resumo, usuario_id, mapa_disciplinas)
         if SHEET_METAS in wb.sheetnames:
-            _importar_metas(conn, wb[SHEET_METAS], modo, resumo)
+            _importar_metas(conn, wb[SHEET_METAS], modo, resumo, usuario_id, mapa_disciplinas)
         if SHEET_CONFIG in wb.sheetnames:
             _importar_config(conn, wb[SHEET_CONFIG], resumo)
 
@@ -171,7 +192,7 @@ def _upsert_by_match(conn, tabela, where_sql, where_params, dados, modo, resumo)
         return cur.lastrowid
 
 
-def _importar_disciplinas(conn, ws, modo, resumo):
+def _importar_disciplinas(conn, ws, modo, resumo, usuario_id, mapa_disciplinas):
     linhas = _sheet_to_dicts(ws)
     pendencias_prereq = []  # (disciplina_id, "codigoA,codigoB")
     for linha in linhas:
@@ -180,6 +201,7 @@ def _importar_disciplinas(conn, ws, modo, resumo):
             continue
         codigo = linha.get("codigo")
         dados = {
+            "usuario_id": usuario_id,
             "nome": nome,
             "codigo": codigo,
             "professor": linha.get("professor"),
@@ -193,9 +215,12 @@ def _importar_disciplinas(conn, ws, modo, resumo):
             "cor": linha.get("cor") or "#6366f1",
             "observacoes": linha.get("observacoes"),
         }
-        where_sql = "codigo = ?" if codigo else "nome = ?"
-        where_params = (codigo,) if codigo else (nome,)
+        where_sql = "usuario_id = ? AND " + ("codigo = ?" if codigo else "nome = ?")
+        where_params = (usuario_id, codigo) if codigo else (usuario_id, nome)
         disciplina_id = _upsert_by_match(conn, "disciplinas", where_sql, where_params, dados, modo, resumo)
+        if codigo:
+            mapa_disciplinas[str(codigo)] = disciplina_id
+        mapa_disciplinas[str(nome)] = disciplina_id
         if linha.get("pre_requisitos"):
             pendencias_prereq.append((disciplina_id, str(linha["pre_requisitos"])))
 
@@ -203,7 +228,7 @@ def _importar_disciplinas(conn, ws, modo, resumo):
     for disciplina_id, texto in pendencias_prereq:
         conn.execute("DELETE FROM pre_requisitos WHERE disciplina_id = ?", (disciplina_id,))
         for ref in [p.strip() for p in texto.split(",") if p.strip()]:
-            requisito_id = _find_disciplina_id(conn, ref)
+            requisito_id = _find_disciplina_id(mapa_disciplinas, ref)
             if requisito_id and requisito_id != disciplina_id:
                 conn.execute(
                     "INSERT OR IGNORE INTO pre_requisitos (disciplina_id, requisito_id) VALUES (?, ?)",
@@ -211,9 +236,9 @@ def _importar_disciplinas(conn, ws, modo, resumo):
                 )
 
 
-def _importar_grade(conn, ws, modo, resumo):
+def _importar_grade(conn, ws, modo, resumo, mapa_disciplinas):
     for linha in _sheet_to_dicts(ws):
-        disciplina_id = _find_disciplina_id(conn, linha.get("disciplina"))
+        disciplina_id = _find_disciplina_id(mapa_disciplinas, linha.get("disciplina"))
         if not disciplina_id:
             resumo["ignorados"] += 1
             continue
@@ -240,9 +265,9 @@ def _importar_grade(conn, ws, modo, resumo):
         conn.execute("UPDATE disciplinas SET periodo = ? WHERE id = ?", (periodo, disciplina_id))
 
 
-def _importar_avaliacoes(conn, ws, modo, resumo):
+def _importar_avaliacoes(conn, ws, modo, resumo, mapa_disciplinas):
     for linha in _sheet_to_dicts(ws):
-        disciplina_id = _find_disciplina_id(conn, linha.get("disciplina"))
+        disciplina_id = _find_disciplina_id(mapa_disciplinas, linha.get("disciplina"))
         if not disciplina_id:
             resumo["ignorados"] += 1
             continue
@@ -268,12 +293,13 @@ def _importar_avaliacoes(conn, ws, modo, resumo):
         _recalcular_media(conn, disciplina_id)
 
 
-def _importar_tarefas(conn, ws, modo, resumo):
+def _importar_tarefas(conn, ws, modo, resumo, usuario_id, mapa_disciplinas):
     for linha in _sheet_to_dicts(ws):
-        disciplina_id = _find_disciplina_id(conn, linha.get("disciplina"))
+        disciplina_id = _find_disciplina_id(mapa_disciplinas, linha.get("disciplina"))
         nome = linha.get("nome") or "Tarefa"
         prazo = str(linha.get("prazo") or "") or None
         dados = {
+            "usuario_id": usuario_id,
             "disciplina_id": disciplina_id,
             "nome": nome,
             "descricao": linha.get("descricao"),
@@ -285,15 +311,15 @@ def _importar_tarefas(conn, ws, modo, resumo):
         }
         _upsert_by_match(
             conn, "tarefas",
-            "nome = ? AND (disciplina_id = ? OR (disciplina_id IS NULL AND ? IS NULL)) AND (prazo = ? OR (prazo IS NULL AND ? IS NULL))",
-            (nome, disciplina_id, disciplina_id, prazo, prazo),
+            "usuario_id = ? AND nome = ? AND (disciplina_id = ? OR (disciplina_id IS NULL AND ? IS NULL)) AND (prazo = ? OR (prazo IS NULL AND ? IS NULL))",
+            (usuario_id, nome, disciplina_id, disciplina_id, prazo, prazo),
             dados, modo, resumo,
         )
 
 
-def _importar_conteudos(conn, ws, modo, resumo):
+def _importar_conteudos(conn, ws, modo, resumo, mapa_disciplinas):
     for linha in _sheet_to_dicts(ws):
-        disciplina_id = _find_disciplina_id(conn, linha.get("disciplina"))
+        disciplina_id = _find_disciplina_id(mapa_disciplinas, linha.get("disciplina"))
         if not disciplina_id:
             resumo["ignorados"] += 1
             continue
@@ -311,14 +337,15 @@ def _importar_conteudos(conn, ws, modo, resumo):
         )
 
 
-def _importar_estudos(conn, ws, modo, resumo):
+def _importar_estudos(conn, ws, modo, resumo, usuario_id, mapa_disciplinas):
     for linha in _sheet_to_dicts(ws):
-        disciplina_id = _find_disciplina_id(conn, linha.get("disciplina"))
+        disciplina_id = _find_disciplina_id(mapa_disciplinas, linha.get("disciplina"))
         data_str = str(linha.get("data") or "")
         if not data_str or linha.get("duracao_min") in (None, ""):
             resumo["ignorados"] += 1
             continue
         dados = {
+            "usuario_id": usuario_id,
             "disciplina_id": disciplina_id,
             "data": data_str,
             "duracao_min": int(linha["duracao_min"]),
@@ -329,17 +356,18 @@ def _importar_estudos(conn, ws, modo, resumo):
         # id explícito, evita duplicar comparando disciplina+data+duração+tipo.
         _upsert_by_match(
             conn, "sessoes_estudo",
-            "data = ? AND duracao_min = ? AND tipo = ? AND (disciplina_id = ? OR (disciplina_id IS NULL AND ? IS NULL))",
-            (data_str, int(linha["duracao_min"]), dados["tipo"], disciplina_id, disciplina_id),
+            "usuario_id = ? AND data = ? AND duracao_min = ? AND tipo = ? AND (disciplina_id = ? OR (disciplina_id IS NULL AND ? IS NULL))",
+            (usuario_id, data_str, int(linha["duracao_min"]), dados["tipo"], disciplina_id, disciplina_id),
             dados, modo, resumo,
         )
 
 
-def _importar_metas(conn, ws, modo, resumo):
+def _importar_metas(conn, ws, modo, resumo, usuario_id, mapa_disciplinas):
     for linha in _sheet_to_dicts(ws):
         titulo = linha.get("titulo") or "Meta"
-        disciplina_id = _find_disciplina_id(conn, linha.get("disciplina"))
+        disciplina_id = _find_disciplina_id(mapa_disciplinas, linha.get("disciplina"))
         dados = {
+            "usuario_id": usuario_id,
             "tipo": linha.get("tipo") or "horas",
             "titulo": titulo,
             "alvo": float(linha["alvo"]) if linha.get("alvo") not in (None, "") else 1.0,
@@ -351,7 +379,7 @@ def _importar_metas(conn, ws, modo, resumo):
             "status": linha.get("status") or "ativa",
         }
         _upsert_by_match(
-            conn, "metas", "titulo = ? AND tipo = ?", (titulo, dados["tipo"]),
+            conn, "metas", "usuario_id = ? AND titulo = ? AND tipo = ?", (usuario_id, titulo, dados["tipo"]),
             dados, modo, resumo,
         )
 
@@ -371,68 +399,74 @@ def _importar_config(conn, ws, resumo):
 
 def _recalcular_media(conn, disciplina_id):
     rows = conn.execute(
-        "SELECT nota, peso FROM avaliacoes WHERE disciplina_id = ? AND nota IS NOT NULL",
+        "SELECT nota FROM avaliacoes WHERE disciplina_id = ? AND nota IS NOT NULL",
         (disciplina_id,),
     ).fetchall()
     if not rows:
         return
-    total_peso = sum(r["peso"] or 1 for r in rows)
-    if total_peso <= 0:
-        return
-    media = sum((r["nota"] or 0) * (r["peso"] or 1) for r in rows) / total_peso
+    # Cada avaliação vale um tanto de pontos (campo "peso") de um total de 100
+    # por disciplina; a nota lançada já é a quantidade de pontos conquistados
+    # naquela avaliação, então a nota final é a soma direta, não uma média.
+    media = sum(r["nota"] or 0 for r in rows)
     conn.execute("UPDATE disciplinas SET media = ? WHERE id = ?", (round(media, 2), disciplina_id))
 
 
-def exportar_xlsx(caminho_destino):
-    """Gera um novo arquivo XLSX com o snapshot atual do SQLite."""
+def exportar_xlsx(caminho_destino, usuario_id):
+    """Gera um novo arquivo XLSX com o snapshot atual do SQLite - apenas com
+    os dados do usuário informado."""
     conn = get_connection()
     try:
         wb = Workbook()
         wb.remove(wb.active)
 
-        _export_disciplinas(conn, wb)
+        _export_disciplinas(conn, wb, usuario_id)
         _export_simples(
             conn, wb, SHEET_AVALIACOES, AVALIACOES_COLS,
             """SELECT a.id, d.nome AS disciplina, a.tipo, a.titulo, a.data, a.peso,
                       a.nota, a.status, a.prioridade, a.observacoes
                FROM avaliacoes a JOIN disciplinas d ON d.id = a.disciplina_id
-               ORDER BY a.data""",
+               WHERE d.usuario_id = ? ORDER BY a.data""",
+            (usuario_id,),
         )
         _export_simples(
             conn, wb, SHEET_TAREFAS, TAREFAS_COLS,
             """SELECT t.id, d.nome AS disciplina, t.nome, t.descricao, t.prazo,
                       t.prioridade, t.status, t.tempo_estimado, t.observacoes
                FROM tarefas t LEFT JOIN disciplinas d ON d.id = t.disciplina_id
-               ORDER BY t.prazo""",
+               WHERE t.usuario_id = ? ORDER BY t.prazo""",
+            (usuario_id,),
         )
         _export_simples(
             conn, wb, SHEET_CONTEUDOS, CONTEUDOS_COLS,
             """SELECT c.id, d.nome AS disciplina, c.titulo, c.status, c.ordem, c.data_conclusao
                FROM conteudos c JOIN disciplinas d ON d.id = c.disciplina_id
-               ORDER BY d.nome, c.ordem""",
+               WHERE d.usuario_id = ? ORDER BY d.nome, c.ordem""",
+            (usuario_id,),
         )
         _export_simples(
             conn, wb, SHEET_ESTUDOS, ESTUDOS_COLS,
             """SELECT s.id, d.nome AS disciplina, s.data, s.duracao_min, s.tipo, s.observacoes
                FROM sessoes_estudo s LEFT JOIN disciplinas d ON d.id = s.disciplina_id
-               ORDER BY s.data""",
+               WHERE s.usuario_id = ? ORDER BY s.data""",
+            (usuario_id,),
         )
         _export_simples(
             conn, wb, SHEET_GRADE, GRADE_COLS,
             """SELECT d.nome AS disciplina, g.periodo, g.ordem
                FROM grade_curricular g JOIN disciplinas d ON d.id = g.disciplina_id
-               ORDER BY g.periodo, g.ordem""",
+               WHERE d.usuario_id = ? ORDER BY g.periodo, g.ordem""",
+            (usuario_id,),
         )
         _export_simples(
             conn, wb, SHEET_METAS, METAS_COLS,
             """SELECT m.id, m.tipo, m.titulo, m.alvo, m.atual, m.unidade,
                       d.nome AS disciplina, m.data_inicio, m.data_fim, m.status
-               FROM metas m LEFT JOIN disciplinas d ON d.id = m.disciplina_id""",
+               FROM metas m LEFT JOIN disciplinas d ON d.id = m.disciplina_id
+               WHERE m.usuario_id = ?""",
+            (usuario_id,),
         )
-        _export_simples(
-            conn, wb, SHEET_CONFIG, CONFIG_COLS,
-            "SELECT chave, valor FROM configuracoes",
-        )
+        # "configuracoes" é uma tabela global (não pertence a nenhum usuário
+        # específico hoje), por isso não entra na exportação pessoal.
 
         wb.save(caminho_destino)
         return caminho_destino
@@ -440,17 +474,19 @@ def exportar_xlsx(caminho_destino):
         conn.close()
 
 
-def _export_simples(conn, wb, nome_aba, colunas, sql):
+def _export_simples(conn, wb, nome_aba, colunas, sql, params=()):
     ws = wb.create_sheet(nome_aba)
     ws.append(colunas)
-    for row in conn.execute(sql).fetchall():
+    for row in conn.execute(sql, params).fetchall():
         ws.append([row[c] if c in row.keys() else None for c in colunas])
 
 
-def _export_disciplinas(conn, wb):
+def _export_disciplinas(conn, wb, usuario_id):
     ws = wb.create_sheet(SHEET_DISCIPLINAS)
     ws.append(DISCIPLINAS_COLS)
-    disciplinas = conn.execute("SELECT * FROM disciplinas ORDER BY periodo, nome").fetchall()
+    disciplinas = conn.execute(
+        "SELECT * FROM disciplinas WHERE usuario_id = ? ORDER BY periodo, nome", (usuario_id,)
+    ).fetchall()
     for d in disciplinas:
         prereqs = conn.execute(
             """SELECT req.codigo, req.nome FROM pre_requisitos pr

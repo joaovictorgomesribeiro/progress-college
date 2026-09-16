@@ -3,6 +3,19 @@
 
 PRAGMA foreign_keys = ON;
 
+-- Contas de usuário. Cada usuário tem seus próprios dados acadêmicos
+-- (disciplinas, avaliações, tarefas, estudos, metas); o catálogo abaixo
+-- é compartilhado entre todos.
+CREATE TABLE IF NOT EXISTS usuarios (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    nome            TEXT NOT NULL,
+    email           TEXT NOT NULL UNIQUE,
+    senha_hash      TEXT NOT NULL,
+    ativo           INTEGER NOT NULL DEFAULT 1,
+    criado_em       TEXT DEFAULT (datetime('now')),
+    atualizado_em   TEXT DEFAULT (datetime('now'))
+);
+
 -- Catálogo acadêmico oficial (universidades/cursos/ementas). Ainda não é
 -- alimentado por nenhuma tela do sistema (a importação de fichas em PDF é
 -- um trabalho futuro) - esta tabela só prepara o terreno para que, quando
@@ -25,6 +38,7 @@ CREATE TABLE IF NOT EXISTS disciplinas_catalogo (
 -- poderão ser criadas a partir de uma seleção no catálogo acima).
 CREATE TABLE IF NOT EXISTS disciplinas (
     id                     INTEGER PRIMARY KEY AUTOINCREMENT,
+    usuario_id             INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
     nome                   TEXT NOT NULL,
     codigo                 TEXT,
     professor              TEXT,
@@ -77,6 +91,7 @@ CREATE TABLE IF NOT EXISTS avaliacoes (
 
 CREATE TABLE IF NOT EXISTS tarefas (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    usuario_id      INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
     disciplina_id   INTEGER,
     nome            TEXT NOT NULL,
     descricao       TEXT,
@@ -101,6 +116,7 @@ CREATE TABLE IF NOT EXISTS conteudos (
 
 CREATE TABLE IF NOT EXISTS sessoes_estudo (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    usuario_id      INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
     disciplina_id   INTEGER,
     data            TEXT NOT NULL,
     duracao_min     INTEGER NOT NULL,
@@ -111,6 +127,7 @@ CREATE TABLE IF NOT EXISTS sessoes_estudo (
 
 CREATE TABLE IF NOT EXISTS metas (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    usuario_id      INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
     tipo            TEXT NOT NULL,      -- horas | exercicios | conteudos | disciplina
     titulo          TEXT NOT NULL,
     alvo            REAL NOT NULL,

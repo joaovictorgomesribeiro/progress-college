@@ -96,8 +96,19 @@ Modos de importação:
 - **Atualizar**: insere novos registros e atualiza os existentes (identificados por nome/código/título).
 - **Substituir**: apaga todos os dados atuais e importa do zero.
 
+## Multiusuário
+
+O sistema suporta múltiplas contas. Cada usuário só enxerga seus próprios dados (disciplinas, avaliações, tarefas, estudos, metas); `disciplinas_catalogo` é a única tabela pensada para ser compartilhada no futuro.
+
+- Autenticação via sessão do Flask (`session["usuario_id"]`), senha com hash (`werkzeug.security`).
+- Rotas: `POST /api/cadastro`, `POST /api/login`, `POST /api/logout`, `GET /api/me`.
+- Toda rota `/api/...` de dados exige sessão válida (`@login_required`) e filtra pelo dono — nunca confia num `usuario_id` vindo do frontend.
+- Migração automática: na primeira execução após atualizar o código, `database.py` cria a tabela `usuarios`, adiciona `usuario_id` nas tabelas pessoais e associa todos os dados já existentes a um usuário inicial (e-mail `celjoaogomes22@gmail.com`, senha temporária impressa no log do servidor na hora da migração — troque assim que possível). Não é preciso rodar nada manualmente.
+- Detalhes de cada rota e da estratégia de isolamento: ver [DOCUMENTACAO.md](DOCUMENTACAO.md).
+
 ## Segurança
 
 - Todas as queries usam parâmetros (`?`) — nunca concatenação de string com dados do usuário.
 - Upload de XLSX limitado a 10MB e validado por extensão antes do processamento.
 - `database.db` nunca é servido como arquivo estático.
+- `secret.key` (chave de sessão) é gerado automaticamente no primeiro start e nunca deve ir para o Git (já está no `.gitignore`).

@@ -10,6 +10,9 @@ const Api = (() => {
     const res = await fetch(`/api${path}`, opts);
     let data = null;
     try { data = await res.json(); } catch (e) { data = null; }
+    if (res.status === 401 && !["/me", "/login", "/cadastro"].includes(path)) {
+      window.dispatchEvent(new CustomEvent("auth:required"));
+    }
     if (!res.ok) {
       const msg = (data && data.error) || `Erro ${res.status}`;
       throw new Error(msg);
@@ -23,6 +26,13 @@ const Api = (() => {
   const del = (path) => request(path, { method: "DELETE" });
 
   return {
+    // Autenticação
+    me: () => get("/me"),
+    login: (dados) => post("/login", dados),
+    cadastro: (dados) => post("/cadastro", dados),
+    logout: () => post("/logout"),
+    trocarSenha: (dados) => post("/trocar-senha", dados),
+
     // Disciplinas
     listarDisciplinas: (params = {}) => get(`/disciplinas${qs(params)}`),
     obterDisciplina: (id) => get(`/disciplinas/${id}`),
@@ -69,7 +79,7 @@ const Api = (() => {
 
     // Dashboard / estatísticas
     obterDashboard: () => get("/dashboard"),
-    obterEstatisticas: () => get("/estatisticas"),
+    obterEstatisticas: (params = {}) => get(`/estatisticas${qs(params)}`),
 
     // Import/export
     async importarXlsx(arquivo, modo) {

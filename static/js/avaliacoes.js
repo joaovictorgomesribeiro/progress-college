@@ -102,8 +102,8 @@ async function abrirFormAvaliacao(avaliacao = null, disciplinaIdFixo = null) {
           <div class="field"><label for="fa-data">Data</label><input id="fa-data" type="date" value="${avaliacao?.data || ""}"></div>
         </div>
         <div class="field-row">
-          <div class="field"><label for="fa-peso">Peso</label><input id="fa-peso" type="number" step="0.1" value="${avaliacao?.peso ?? 1}"></div>
-          <div class="field"><label for="fa-nota">Nota</label><input id="fa-nota" type="number" step="0.1" min="0" max="10" value="${avaliacao?.nota ?? ""}"></div>
+          <div class="field"><label for="fa-peso">Valor (pontos)</label><input id="fa-peso" type="number" step="0.1" min="0" max="100" value="${avaliacao?.peso ?? ""}" placeholder="Ex: 28"></div>
+          <div class="field"><label for="fa-nota">Nota (pontos obtidos)</label><input id="fa-nota" type="number" step="0.1" min="0" max="100" value="${avaliacao?.nota ?? ""}" placeholder="Ex: 25"></div>
         </div>
         <div class="field-row">
           <div class="field"><label for="fa-prioridade">Prioridade</label>

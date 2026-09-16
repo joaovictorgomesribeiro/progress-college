@@ -172,7 +172,7 @@ async function abrirFormDisciplina(disciplina = null) {
           </select>
         </div>
         <div class="field-row">
-          <div class="field"><label for="f-media">Média</label><input id="f-media" type="number" step="0.1" min="0" max="10" value="${disciplina?.media ?? ""}"></div>
+          <div class="field"><label for="f-media">Nota atual (pontos)</label><input id="f-media" type="number" step="0.1" min="0" max="100" value="${disciplina?.media ?? ""}"></div>
           <div class="field"><label for="f-frequencia">Frequência (%)</label><input id="f-frequencia" type="number" step="0.1" min="0" max="100" value="${disciplina?.frequencia ?? ""}"></div>
         </div>
         <div class="field"><label for="f-cor">Cor de identificação</label><input id="f-cor" type="color" value="${disciplina?.cor || "#2563eb"}"></div>
@@ -247,7 +247,7 @@ function renderHorariosRows(horariosState) {
       </div>
       <div class="field"><label>Início</label><input type="time" data-h-inicio="${i}" value="${h.hora_inicio}"></div>
       <div class="field"><label>Fim</label><input type="time" data-h-fim="${i}" value="${h.hora_fim}"></div>
-      <button type="button" class="icon-btn" data-h-remover="${i}" aria-label="Remover horário">${icon("x")}</button>
+      <button type="button" class="icon-btn" data-h-remover="${i}" aria-label="Remover horário" title="Remover horário">${icon("x")}</button>
     </div>
   `).join("") : `<p class="field-hint" style="margin:0 0 8px;">Nenhum horário adicionado.</p>`;
 
@@ -339,22 +339,24 @@ const DIAS_SEMANA = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 /* ---------- Aba Notas: calculadora "quanto preciso tirar?" ---------- */
 async function renderTabNotas(container, d) {
   const avaliacoes = await Api.listarAvaliacoes({ disciplina_id: d.id });
+  const pontosObtidos = avaliacoes.filter((a) => a.nota != null).reduce((s, a) => s + (a.nota || 0), 0);
+  const pontosDefinidos = avaliacoes.reduce((s, a) => s + (a.peso || 0), 0);
   container.innerHTML = `
     <div class="section">
       <div class="section-header"><h2>Notas lançadas</h2></div>
-      ${avaliacoes.length ? `<table class="data-table"><thead><tr><th>Avaliação</th><th>Peso</th><th>Nota</th></tr></thead>
+      ${avaliacoes.length ? `<table class="data-table"><thead><tr><th>Avaliação</th><th>Valor</th><th>Nota</th></tr></thead>
         <tbody>${avaliacoes.map((a) => `<tr><td>${a.titulo}</td><td>${a.peso}</td><td>${a.nota ?? "—"}</td></tr>`).join("")}</tbody></table>`
         : `<p class="empty-state">Nenhuma avaliação com nota lançada ainda.</p>`}
-      <p style="margin-top:var(--space-3);">Média atual: <strong>${d.media != null ? d.media.toFixed(2) : "—"}</strong></p>
+      <p style="margin-top:var(--space-3);">Nota atual: <strong>${pontosObtidos.toFixed(1)}</strong> de ${pontosDefinidos.toFixed(0)} ponto(s) já distribuído(s) <span class="field-hint">(uma disciplina completa soma 100)</span></p>
     </div>
 
     <div class="section">
       <div class="section-header"><h2>Quanto preciso tirar?</h2></div>
       <div class="panel">
-        <p class="field-hint" style="margin-top:0;">Informe a média desejada e o peso das avaliações que faltam para calcular a nota necessária.</p>
+        <p class="field-hint" style="margin-top:0;">Informe a nota mínima desejada (de 0 a 100) e quantos pontos ainda estão disponíveis nas avaliações que faltam.</p>
         <div class="field-row">
-          <div class="field"><label for="fn-meta">Média desejada</label><input id="fn-meta" type="number" step="0.1" min="0" max="10" value="7"></div>
-          <div class="field"><label for="fn-peso-restante">Peso restante</label><input id="fn-peso-restante" type="number" step="0.1" value="${somaPesoPendente(avaliacoes) || 1}"></div>
+          <div class="field"><label for="fn-meta">Nota mínima desejada</label><input id="fn-meta" type="number" step="1" min="0" max="100" value="60"></div>
+          <div class="field"><label for="fn-peso-restante">Pontos restantes disponíveis</label><input id="fn-peso-restante" type="number" step="0.1" value="${somaPesoPendente(avaliacoes) || (100 - pontosDefinidos) || 0}"></div>
         </div>
         <button class="btn btn-primary" id="btn-calcular-nota">Calcular</button>
         <div id="resultado-nota" style="margin-top:var(--space-4);"></div>
@@ -364,28 +366,24 @@ async function renderTabNotas(container, d) {
 
   container.querySelector("#btn-calcular-nota").addEventListener("click", () => {
     const metaDesejada = parseFloat(document.getElementById("fn-meta").value);
-    const pesoRestante = parseFloat(document.getElementById("fn-peso-restante").value) || 0;
-    const lancadas = avaliacoes.filter((a) => a.nota != null);
-    const pesoLancado = lancadas.reduce((s, a) => s + (a.peso || 1), 0);
-    const somaLancada = lancadas.reduce((s, a) => s + (a.nota || 0) * (a.peso || 1), 0);
-    const pesoTotal = pesoLancado + pesoRestante;
+    const pontosRestantes = parseFloat(document.getElementById("fn-peso-restante").value) || 0;
     const resultado = document.getElementById("resultado-nota");
-    if (pesoRestante <= 0 || pesoTotal <= 0) {
-      resultado.innerHTML = `<p class="empty-state">Adicione um peso válido para a(s) avaliação(ões) restante(s).</p>`;
+    if (pontosRestantes <= 0) {
+      resultado.innerHTML = `<p class="empty-state">Informe quantos pontos ainda estão disponíveis nas avaliações que faltam.</p>`;
       return;
     }
-    const necessario = (metaDesejada * pesoTotal - somaLancada) / pesoRestante;
-    const atingivel = necessario <= 10;
+    const necessario = metaDesejada - pontosObtidos;
+    const atingivel = necessario <= pontosRestantes;
     resultado.innerHTML = `<div class="notas-result">
-      <div class="field-hint">Para terminar com ${metaDesejada.toFixed(1)}, você precisa tirar:</div>
-      <div class="notas-big" style="color:${atingivel ? "var(--success)" : "var(--danger)"}">${necessario.toFixed(1)}</div>
-      ${!atingivel ? `<div class="field-hint">Não é matematicamente possível com o peso informado.</div>` : ""}
+      <div class="field-hint">Para terminar com ${metaDesejada.toFixed(0)} pontos, você precisa somar nas avaliações restantes:</div>
+      <div class="notas-big" style="color:${atingivel ? "var(--success)" : "var(--danger)"}">${necessario <= 0 ? "0 (meta já atingida)" : necessario.toFixed(1)}</div>
+      ${!atingivel ? `<div class="field-hint">Não é matematicamente possível com os pontos restantes informados.</div>` : ""}
     </div>`;
   });
 }
 
 function somaPesoPendente(avaliacoes) {
-  return avaliacoes.filter((a) => a.nota == null).reduce((s, a) => s + (a.peso || 1), 0);
+  return avaliacoes.filter((a) => a.nota == null).reduce((s, a) => s + (a.peso || 0), 0);
 }
 
 /* ---------- Aba Conteúdos ---------- */
@@ -403,7 +401,7 @@ async function renderTabConteudos(container, d) {
             <div class="list-row-title" style="${c.status === "concluido" ? "text-decoration:line-through; color:var(--text-muted);" : ""}">${c.titulo}</div>
             <div class="list-row-sub">${STATUS_CONTEUDO_LABEL[c.status]}</div>
           </div>
-          <button class="icon-btn" data-editar-conteudo="${c.id}" aria-label="Editar conteúdo">${icon("edit")}</button>
+          <button class="icon-btn" data-editar-conteudo="${c.id}" aria-label="Editar conteúdo" title="Editar conteúdo">${icon("edit")}</button>
         </div>`).join("")}
     </div>` : `<p class="empty-state">Nenhum conteúdo cadastrado.</p>`}
   `;
@@ -505,9 +503,15 @@ async function renderTabTarefasDisciplina(container, d) {
 }
 
 /* ---------- Aba Estudos da disciplina ---------- */
+let discEstudosPagina = 1;
+
 async function renderTabEstudosDisciplina(container, d) {
-  const sessoes = await Api.listarEstudos({ disciplina_id: d.id });
-  const totalMin = sessoes.reduce((s, x) => s + x.duracao_min, 0);
+  const [resp, todasResp] = await Promise.all([
+    Api.listarEstudos({ disciplina_id: d.id, pagina: discEstudosPagina, por_pagina: 20 }),
+    Api.listarEstudos({ disciplina_id: d.id, por_pagina: 100 }),
+  ]);
+  const sessoes = resp.itens;
+  const totalMin = todasResp.itens.reduce((s, x) => s + x.duracao_min, 0);
   container.innerHTML = `
     <div class="stat-line" style="margin-bottom:var(--space-4);">
       <div class="stat-item"><span class="stat-value">${(totalMin / 60).toFixed(1)}h</span><span class="stat-label">estudadas nesta matéria</span></div>
@@ -523,6 +527,11 @@ async function renderTabEstudosDisciplina(container, d) {
           <div class="list-row-meta">${formatarData(s.data)} · ${s.duracao_min} min</div>
         </div>`).join("")}
     </div>` : `<p class="empty-state">Nenhuma sessão de estudo registrada.</p>`}
+    ${paginacaoHtml(resp)}
   `;
   container.querySelector("#btn-novo-estudo-disc").addEventListener("click", () => abrirFormEstudo(d.id));
+  const btnAnterior = container.querySelector("[data-pagina-anterior]");
+  const btnProxima = container.querySelector("[data-pagina-proxima]");
+  if (btnAnterior) btnAnterior.addEventListener("click", () => { discEstudosPagina--; renderTabEstudosDisciplina(container, d); });
+  if (btnProxima) btnProxima.addEventListener("click", () => { discEstudosPagina++; renderTabEstudosDisciplina(container, d); });
 }

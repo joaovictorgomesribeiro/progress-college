@@ -1,8 +1,10 @@
 /* Meu Sistema de Estudos - Estatísticas (gráficos simples, sem dependências externas) */
 
+let estatisticasNotasPagina = 1;
+
 registerPage("estatisticas", {
   async render(container) {
-    const stats = await Api.obterEstatisticas();
+    const stats = await Api.obterEstatisticas({ pagina: estatisticasNotasPagina, por_pagina: 20 });
     const maiorHoras = Math.max(1, ...stats.horas_por_disciplina.map((h) => h.horas));
     const maiorMinutos = Math.max(1, ...stats.serie_dias.map((d) => d.minutos));
 
@@ -40,10 +42,11 @@ registerPage("estatisticas", {
 
       <div class="section">
         <div class="section-header"><h2>Evolução das notas</h2></div>
-        ${stats.evolucao_notas.length ? `<div class="scroll-x"><table class="data-table">
+        ${stats.evolucao_notas.itens.length ? `<div class="scroll-x"><table class="data-table">
           <thead><tr><th>Data</th><th>Matéria</th><th>Avaliação</th><th>Nota</th></tr></thead>
-          <tbody>${stats.evolucao_notas.map((n) => `<tr><td>${formatarData(n.data)}</td><td>${n.disciplina_nome}</td><td>${n.titulo}</td><td>${n.nota}</td></tr>`).join("")}</tbody>
+          <tbody>${stats.evolucao_notas.itens.map((n) => `<tr><td>${formatarData(n.data)}</td><td>${n.disciplina_nome}</td><td>${n.titulo}</td><td>${n.nota}</td></tr>`).join("")}</tbody>
         </table></div>` : `<p class="empty-state">Nenhuma nota lançada ainda.</p>`}
+        ${paginacaoHtml(stats.evolucao_notas)}
       </div>
 
       <div class="section">
@@ -54,6 +57,11 @@ registerPage("estatisticas", {
         </div>
       </div>
     `;
+
+    const btnAnterior = container.querySelector("[data-pagina-anterior]");
+    const btnProxima = container.querySelector("[data-pagina-proxima]");
+    if (btnAnterior) btnAnterior.addEventListener("click", () => { estatisticasNotasPagina--; App.refresh(); });
+    if (btnProxima) btnProxima.addEventListener("click", () => { estatisticasNotasPagina++; App.refresh(); });
   },
 });
 

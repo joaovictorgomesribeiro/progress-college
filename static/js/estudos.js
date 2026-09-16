@@ -2,15 +2,23 @@
 
 const TIPO_SESSAO_LABEL = { estudo: "Estudo", revisao: "Revisão", exercicios: "Exercícios", pomodoro: "Pomodoro" };
 const TIPO_META_LABEL = { horas: "Horas", exercicios: "Exercícios", conteudos: "Conteúdos", disciplina: "Disciplina" };
+const ESTUDOS_POR_PAGINA = 20;
+let estudosPagina = 1;
 
 registerPage("estudos", {
   async render(container) {
-    const [sessoes, metas] = await Promise.all([Api.listarEstudos(), Api.listarMetas()]);
-    const metaSemanal = metas.find((m) => m.tipo === "horas" && m.status === "ativa" && !m.disciplina_id) || null;
     const inicioSemana = new Date();
     inicioSemana.setDate(inicioSemana.getDate() - inicioSemana.getDay());
     const isoInicioSemana = inicioSemana.toISOString().slice(0, 10);
-    const minutosSemana = sessoes.filter((s) => s.data >= isoInicioSemana).reduce((s, x) => s + x.duracao_min, 0);
+
+    const [semanaResp, recentesResp, metas] = await Promise.all([
+      Api.listarEstudos({ desde: isoInicioSemana, por_pagina: 100 }),
+      Api.listarEstudos({ pagina: estudosPagina, por_pagina: ESTUDOS_POR_PAGINA }),
+      Api.listarMetas(),
+    ]);
+    const sessoes = recentesResp.itens;
+    const metaSemanal = metas.find((m) => m.tipo === "horas" && m.status === "ativa" && !m.disciplina_id) || null;
+    const minutosSemana = semanaResp.itens.reduce((s, x) => s + x.duracao_min, 0);
     const horasSemana = minutosSemana / 60;
     const metaHoras = metaSemanal ? metaSemanal.alvo : 10;
     const pct = Math.min(100, Math.round((horasSemana / metaHoras) * 100));
@@ -34,16 +42,17 @@ registerPage("estudos", {
       <div class="section">
         <div class="section-header"><h2>Sessões recentes</h2><button class="btn btn-sm" id="btn-nova-sessao">${icon("plus")} Registrar</button></div>
         <div class="list">
-          ${sessoes.length ? sessoes.slice(0, 20).map((s) => `
+          ${sessoes.length ? sessoes.map((s) => `
             <div class="list-row" style="cursor:default;">
               <div class="list-row-main">
                 <div class="list-row-title">${s.disciplina_nome || "Estudo geral"}</div>
                 <div class="list-row-sub">${TIPO_SESSAO_LABEL[s.tipo] || s.tipo}${s.observacoes ? " · " + s.observacoes : ""}</div>
               </div>
               <div class="list-row-meta">${formatarData(s.data)} · ${s.duracao_min} min</div>
-              <button class="icon-btn" data-excluir-estudo="${s.id}" aria-label="Excluir sessão">${icon("trash")}</button>
+              <button class="icon-btn" data-excluir-estudo="${s.id}" aria-label="Excluir sessão" title="Excluir sessão">${icon("trash")}</button>
             </div>`).join("") : `<p class="empty-state">Nenhuma sessão registrada ainda.</p>`}
         </div>
+        ${paginacaoHtml(recentesResp)}
       </div>
     `;
 
@@ -59,6 +68,10 @@ registerPage("estudos", {
       const m = metas.find((x) => String(x.id) === row.dataset.id);
       abrirFormMeta(m);
     }));
+    const btnAnterior = container.querySelector("[data-pagina-anterior]");
+    const btnProxima = container.querySelector("[data-pagina-proxima]");
+    if (btnAnterior) btnAnterior.addEventListener("click", () => { estudosPagina--; App.refresh(); });
+    if (btnProxima) btnProxima.addEventListener("click", () => { estudosPagina++; App.refresh(); });
   },
 });
 

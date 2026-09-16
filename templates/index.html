@@ -21,11 +21,31 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='css/responsive.css') }}">
 </head>
 <body>
-<div id="app-shell">
+<div id="auth-screen" hidden>
+  <div class="auth-card">
+    <span class="brand-mark" style="width:40px;height:40px;font-size:15px;border-radius:10px;margin-bottom:8px;">ME</span>
+    <h1 id="auth-titulo">Meu Sistema de Estudos</h1>
+    <p class="field-hint" id="auth-subtitulo">Entre com sua conta para continuar.</p>
+
+    <form id="form-auth">
+      <div class="field" id="auth-campo-nome" hidden><label for="auth-nome">Nome</label><input id="auth-nome" autocomplete="name"></div>
+      <div class="field"><label for="auth-email">E-mail</label><input id="auth-email" type="email" required autocomplete="username"></div>
+      <div class="field"><label for="auth-senha">Senha</label><input id="auth-senha" type="password" required autocomplete="current-password"></div>
+      <p class="field-hint" id="auth-erro" style="color:var(--danger); display:none;"></p>
+      <button type="submit" class="btn btn-primary btn-block" id="auth-submit">Entrar</button>
+    </form>
+
+    <button type="button" class="btn btn-block" id="auth-alternar" style="margin-top:var(--space-2);">Não tem conta? Cadastre-se</button>
+  </div>
+</div>
+
+<div id="app-shell" hidden>
   <header id="topbar">
     <div class="brand"><span class="brand-mark">ME</span> <span>Meu Sistema de Estudos</span></div>
     <div class="actions">
-      <button id="theme-toggle" class="icon-btn" type="button" aria-label="Alternar tema"></button>
+      <span id="usuario-nome" class="field-hint"></span>
+      <button id="theme-toggle" class="icon-btn" type="button" aria-label="Alternar tema" title="Alternar tema"></button>
+      <button id="logout-btn" class="icon-btn" type="button" aria-label="Sair" title="Sair"></button>
     </div>
   </header>
 
@@ -39,7 +59,7 @@
   </div>
 
   <nav id="bottom-nav" aria-label="Navegação principal"></nav>
-  <button id="fab" type="button" aria-label="Adicionar" hidden></button>
+  <button id="fab" type="button" aria-label="Adicionar" title="Adicionar" hidden></button>
 </div>
 
 <div id="modal-root" hidden aria-hidden="true"></div>

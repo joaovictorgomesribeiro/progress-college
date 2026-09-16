@@ -17,9 +17,9 @@ registerPage("calendario", {
 
       <div class="panel" style="margin-bottom:var(--space-5);">
         <div class="page-header" style="margin-bottom:var(--space-3);">
-          <button class="icon-btn" id="cal-prev" aria-label="Mês anterior">${icon("arrowLeft")}</button>
+          <button class="icon-btn" id="cal-prev" aria-label="Mês anterior" title="Mês anterior">${icon("arrowLeft")}</button>
           <h2>${MESES_NOMES[calMesAtual]} ${calAnoAtual}</h2>
-          <button class="icon-btn" id="cal-next" aria-label="Próximo mês" style="transform:scaleX(-1);">${icon("arrowLeft")}</button>
+          <button class="icon-btn" id="cal-next" aria-label="Próximo mês" title="Próximo mês" style="transform:scaleX(-1);">${icon("arrowLeft")}</button>
         </div>
         <div class="cal-weekday-row">${["D", "S", "T", "Q", "Q", "S", "S"].map((d) => `<span>${d}</span>`).join("")}</div>
         <div class="cal-month-grid" id="cal-grid"></div>

@@ -22,10 +22,23 @@ const ICONS = {
   sun: '<circle cx="12" cy="12" r="4"/><path d="M12 3v2M12 19v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M3 12h2M19 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4"/>',
   upload: '<path d="M12 15V4M8 8l4-4 4 4"/><path d="M4.5 15v3.5a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V15"/>',
   download: '<path d="M12 4v11M8 11l4 4 4-4"/><path d="M4.5 15v3.5a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V15"/>',
+  logout: '<path d="M9 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h3"/><path d="M15 16l4-4-4-4"/><path d="M19 12H9"/>',
 };
 
 function icon(name, cls = "icon") {
   return `<svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true">${ICONS[name] || ""}</svg>`;
+}
+
+/* Controles de "Anterior/Próxima" para respostas paginadas do backend
+   ({itens, total, pagina, por_pagina, paginas}). Quem chama precisa ligar os
+   listeners de [data-pagina-anterior]/[data-pagina-proxima] depois de injetar. */
+function paginacaoHtml(resp) {
+  if (resp.paginas <= 1) return "";
+  return `<div class="field-row" style="justify-content:space-between; align-items:center; margin-top:var(--space-3);">
+    <button class="btn btn-sm" data-pagina-anterior ${resp.pagina <= 1 ? "disabled" : ""}>Anterior</button>
+    <span class="field-hint" style="margin:0;">Página ${resp.pagina} de ${resp.paginas}</span>
+    <button class="btn btn-sm" data-pagina-proxima ${resp.pagina >= resp.paginas ? "disabled" : ""}>Próxima</button>
+  </div>`;
 }
 
 const NAV_ITEMS = [
@@ -110,7 +123,7 @@ const UI = (() => {
     root.innerHTML = `<div class="modal-sheet" role="dialog" aria-modal="true">
       <div class="modal-header">
         <h3>${title}</h3>
-        <button type="button" class="icon-btn" id="modal-close" aria-label="Fechar">${icon("x")}</button>
+        <button type="button" class="icon-btn" id="modal-close" aria-label="Fechar" title="Fechar">${icon("x")}</button>
       </div>
       <div class="modal-body">${bodyHtml}</div>
       ${actionsHtml ? `<div class="modal-actions"><button type="button" class="btn" id="modal-cancel">Cancelar</button>${actionsHtml}</div>` : ""}
@@ -190,6 +203,17 @@ registerPage("config", {
       </div>
 
       <div class="section">
+        <div class="section-header"><h2>Conta</h2></div>
+        <div class="panel">
+          <form id="form-trocar-senha">
+            <div class="field"><label for="cfg-senha-atual">Senha atual</label><input id="cfg-senha-atual" type="password" required autocomplete="current-password"></div>
+            <div class="field"><label for="cfg-senha-nova">Nova senha</label><input id="cfg-senha-nova" type="password" required minlength="6" autocomplete="new-password"></div>
+            <button type="submit" class="btn btn-primary">Trocar senha</button>
+          </form>
+        </div>
+      </div>
+
+      <div class="section">
         <div class="section-header"><h2>Importar planilha</h2></div>
         <div class="panel">
           <p class="field-hint" style="margin-top:0;">A importação pode adicionar ou atualizar dados existentes.</p>
@@ -229,6 +253,17 @@ registerPage("config", {
       });
     });
 
+    container.querySelector("#form-trocar-senha").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const senhaAtual = document.getElementById("cfg-senha-atual").value;
+      const senhaNova = document.getElementById("cfg-senha-nova").value;
+      try {
+        await Api.trocarSenha({ senha_atual: senhaAtual, senha_nova: senhaNova });
+        document.getElementById("form-trocar-senha").reset();
+        UI.showToast("Senha alterada.");
+      } catch (err) { UI.showToast(err.message); }
+    });
+
     container.querySelector("#btn-importar").addEventListener("click", () => {
       const input = document.getElementById("import-file-input");
       input.value = "";
@@ -254,13 +289,96 @@ registerPage("config", {
   },
 });
 
-/* ---------- Inicialização ---------- */
-document.addEventListener("DOMContentLoaded", () => {
-  buildSidebarAndNav();
-  aplicarTemaSalvo();
-  window.addEventListener("hashchange", App.render);
-  if (!location.hash) location.hash = "#/dashboard";
+/* ---------- Autenticação ---------- */
+let authModo = "login"; // "login" | "cadastro"
+
+let appJaIniciado = false;
+
+function aplicarUsuarioLogado(usuario) {
+  document.getElementById("usuario-nome").textContent = usuario.nome;
+  document.getElementById("logout-btn").innerHTML = icon("logout");
+  document.getElementById("logout-btn").onclick = async () => {
+    await Api.logout();
+    mostrarTelaAuth();
+  };
+}
+
+async function iniciarApp(usuario) {
+  aplicarUsuarioLogado(usuario);
+  document.getElementById("auth-screen").hidden = true;
+  document.getElementById("app-shell").hidden = false;
+  if (!appJaIniciado) {
+    appJaIniciado = true;
+    buildSidebarAndNav();
+    aplicarTemaSalvo();
+    window.addEventListener("hashchange", App.render);
+    if (!location.hash) location.hash = "#/dashboard";
+  }
   App.render();
+}
+
+function mostrarTelaAuth() {
+  document.getElementById("app-shell").hidden = true;
+  const tela = document.getElementById("auth-screen");
+  tela.hidden = false;
+  aplicarModoAuth();
+}
+
+function aplicarModoAuth() {
+  const cadastro = authModo === "cadastro";
+  document.getElementById("auth-titulo").textContent = "Meu Sistema de Estudos";
+  document.getElementById("auth-subtitulo").textContent = cadastro
+    ? "Crie sua conta para começar."
+    : "Entre com sua conta para continuar.";
+  document.getElementById("auth-campo-nome").hidden = !cadastro;
+  document.getElementById("auth-submit").textContent = cadastro ? "Criar conta" : "Entrar";
+  document.getElementById("auth-alternar").textContent = cadastro
+    ? "Já tem conta? Entrar"
+    : "Não tem conta? Cadastre-se";
+  document.getElementById("auth-erro").style.display = "none";
+}
+
+function configurarAuth() {
+  document.getElementById("auth-alternar").addEventListener("click", () => {
+    authModo = authModo === "login" ? "cadastro" : "login";
+    aplicarModoAuth();
+  });
+
+  document.getElementById("form-auth").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const erroEl = document.getElementById("auth-erro");
+    erroEl.style.display = "none";
+    const email = document.getElementById("auth-email").value.trim();
+    const senha = document.getElementById("auth-senha").value;
+    try {
+      let usuario;
+      if (authModo === "cadastro") {
+        const nome = document.getElementById("auth-nome").value.trim();
+        if (!nome) { throw new Error("Informe seu nome."); }
+        usuario = await Api.cadastro({ nome, email, senha });
+      } else {
+        usuario = await Api.login({ email, senha });
+      }
+      document.getElementById("form-auth").reset();
+      await iniciarApp(usuario);
+    } catch (err) {
+      erroEl.textContent = err.message;
+      erroEl.style.display = "block";
+    }
+  });
+
+  window.addEventListener("auth:required", () => mostrarTelaAuth());
+}
+
+/* ---------- Inicialização ---------- */
+document.addEventListener("DOMContentLoaded", async () => {
+  configurarAuth();
+  try {
+    const usuario = await Api.me();
+    await iniciarApp(usuario);
+  } catch (e) {
+    mostrarTelaAuth();
+  }
 });
 
 function navItemHtml(item) {

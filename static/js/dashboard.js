@@ -2,7 +2,10 @@
 
 registerPage("dashboard", {
   async render(container) {
-    const dash = await Api.obterDashboard();
+    const [dash, disciplinas] = await Promise.all([
+      Api.obterDashboard(),
+      Api.listarDisciplinas({ status: "andamento" }),
+    ]);
 
     if (!dash.tem_dados) {
       container.innerHTML = `
@@ -22,7 +25,6 @@ registerPage("dashboard", {
       return;
     }
 
-    const disciplinas = await Api.listarDisciplinas({ status: "andamento" });
     const tarefasPendentes = dash.tarefas_total - dash.tarefas_concluidas;
     const focoAvaliacoes = dash.foco_do_dia.filter((f) => f.tipo === "avaliacao").slice(0, 4);
     const focoTarefas = dash.foco_do_dia.filter((f) => f.tipo === "tarefa").slice(0, 5);
