@@ -1,7 +1,7 @@
 /* Meu Sistema de Estudos - Tarefas */
 
 const STATUS_TAREFA_LABEL = { pendente: "Pendente", andamento: "Em andamento", concluida: "Concluída" };
-const STATUS_TAREFA_BADGE = { pendente: "badge-warning", andamento: "badge-info", concluida: "badge-success" };
+const STATUS_TAREFA_BADGE = { pendente: "badge-neutral", andamento: "badge-info", concluida: "badge-success" };
 let tarefasFiltroStatus = "";
 
 registerPage("tarefas", {
@@ -10,19 +10,19 @@ registerPage("tarefas", {
     const tarefas = await Api.listarTarefas(tarefasFiltroStatus ? { status: tarefasFiltroStatus } : {});
 
     container.innerHTML = `
-      <div class="section-title">
+      <div class="page-header">
         <h1>Tarefas</h1>
-        <button class="btn btn-primary btn-sm" id="btn-nova-tarefa">+ Nova tarefa</button>
+        <button class="btn btn-primary btn-sm" id="btn-nova-tarefa">${icon("plus")} Nova tarefa</button>
       </div>
-      <div class="tabs">
+      <div class="filter-row">
         ${["", "pendente", "andamento", "concluida"].map((s) => `
-          <button class="tab-btn ${tarefasFiltroStatus === s ? "active" : ""}" data-status="${s}">
+          <button class="filter-chip ${tarefasFiltroStatus === s ? "active" : ""}" data-status="${s}">
             ${s === "" ? "Todas" : STATUS_TAREFA_LABEL[s]}
           </button>`).join("")}
       </div>
 
-      <div class="cards-grid" style="margin-top:14px;">
-        ${tarefas.length ? tarefas.map(tarefaCardHtml).join("") : emptyState("✅", "Você ainda não possui tarefas. Toque em “+ Nova tarefa” para criar a primeira.")}
+      <div class="list">
+        ${tarefas.length ? tarefas.map(tarefaRowHtml).join("") : `<p class="empty-state">Você ainda não possui tarefas.</p>`}
       </div>
     `;
 
@@ -31,10 +31,10 @@ registerPage("tarefas", {
       tarefasFiltroStatus = btn.dataset.status;
       App.refresh();
     }));
-    container.querySelectorAll(".tarefa-card").forEach((card) => {
-      card.addEventListener("click", (e) => {
+    container.querySelectorAll(".list-row[data-id]").forEach((row) => {
+      row.addEventListener("click", (e) => {
         if (e.target.closest("[data-toggle-status]")) return;
-        const t = tarefas.find((x) => String(x.id) === card.dataset.id);
+        const t = tarefas.find((x) => String(x.id) === row.dataset.id);
         abrirFormTarefa(t);
       });
     });
@@ -50,20 +50,19 @@ registerPage("tarefas", {
   },
 });
 
-function tarefaCardHtml(t) {
+function tarefaRowHtml(t) {
   const dias = t.prazo ? diasRestantes(t.prazo) : null;
   const atrasada = dias !== null && dias < 0 && t.status !== "concluida";
-  return `<div class="card tarefa-card" data-id="${t.id}" role="button" tabindex="0" style="${atrasada ? "border-left:4px solid var(--danger);" : ""}">
-    <div class="disciplina-top">
-      <input type="checkbox" data-toggle-status="${t.id}" ${t.status === "concluida" ? "checked" : ""} style="width:22px;height:22px;">
-      <div>
-        <h3 style="${t.status === "concluida" ? "text-decoration:line-through; color:var(--text-muted);" : ""}">${t.nome}</h3>
-        <div class="disciplina-meta"><span>${t.disciplina_nome || "Geral"}</span><span class="badge ${PRIORIDADE_BADGE[t.prioridade]}">${PRIORIDADE_LABEL[t.prioridade]}</span></div>
-      </div>
+  return `<div class="list-row" data-id="${t.id}">
+    <input type="checkbox" class="list-row-checkbox" data-toggle-status="${t.id}" ${t.status === "concluida" ? "checked" : ""}>
+    <div class="list-row-main">
+      <div class="list-row-title" style="${t.status === "concluida" ? "text-decoration:line-through; color:var(--text-muted);" : ""}">${t.nome}</div>
+      <div class="list-row-sub">${t.disciplina_nome || "Geral"}</div>
     </div>
-    <div class="disciplina-meta">
+    <div class="list-row-meta">
+      <span class="badge ${PRIORIDADE_BADGE[t.prioridade]}">${PRIORIDADE_LABEL[t.prioridade]}</span>
       <span class="badge ${STATUS_TAREFA_BADGE[t.status]}">${STATUS_TAREFA_LABEL[t.status]}</span>
-      <span>${t.prazo ? formatarData(t.prazo) : "Sem prazo"}${atrasada ? " ⚠️" : ""}</span>
+      <span style="min-width:78px; display:inline-block; text-align:right; color:${atrasada ? "var(--danger)" : "inherit"};">${t.prazo ? formatarData(t.prazo) : "Sem prazo"}</span>
     </div>
   </div>`;
 }

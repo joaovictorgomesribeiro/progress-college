@@ -1,16 +1,44 @@
 /* Meu Sistema de Estudos - shell da aplicação: roteamento, navegação, modal, tema */
 
+const ICONS = {
+  home: '<path d="M3 11.5 12 4l9 7.5"/><path d="M5 10v9a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1v-9"/>',
+  book: '<path d="M12 6c-1.8-1.4-4.2-2-7-2v13c2.8 0 5.2.6 7 2 1.8-1.4 4.2-2 7-2V4c-2.8 0-5.2.6-7 2Z"/><path d="M12 6v13"/>',
+  check: '<rect x="3.5" y="3.5" width="17" height="17" rx="3"/><path d="m8 12 3 3 5-6"/>',
+  calendar: '<rect x="3.5" y="4.5" width="17" height="16" rx="2.5"/><path d="M3.5 9.5h17"/><path d="M8 3v3M16 3v3"/>',
+  file: '<path d="M6 3.5h9l4 4V20a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4.5a1 1 0 0 1 1-1Z"/><path d="M14.5 3.5V8h4.3"/><path d="M8 13h8M8 16.5h8M8 9.5h4"/>',
+  target: '<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4"/>',
+  clock: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>',
+  bars: '<path d="M3 20h18"/><path d="M6 20V11M12 20V5M18 20v-6"/>',
+  grid: '<rect x="3.5" y="3.5" width="7" height="7" rx="1.2"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.2"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.2"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.2"/>',
+  sliders: '<path d="M4 6h9M17 6h3M4 12h3M11 12h9M4 18h13M20 18h0"/><circle cx="15" cy="6" r="1.8"/><circle cx="7" cy="12" r="1.8"/><circle cx="16" cy="18" r="1.8"/>',
+  more: '<circle cx="5" cy="12" r="1.4" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.4" fill="currentColor" stroke="none"/><circle cx="19" cy="12" r="1.4" fill="currentColor" stroke="none"/>',
+  arrowLeft: '<path d="M19 12H5"/><path d="m11 18-6-6 6-6"/>',
+  x: '<path d="M6 6l12 12M18 6 6 18"/>',
+  plus: '<path d="M12 5v14M5 12h14"/>',
+  edit: '<path d="M4 20h4L18.5 9.5a2 2 0 0 0 0-2.8l-1.2-1.2a2 2 0 0 0-2.8 0L4 15v5Z"/><path d="m13.5 6.5 3 3"/>',
+  trash: '<path d="M4.5 6.5h15"/><path d="M9 6.5V5a1.5 1.5 0 0 1 1.5-1.5h3A1.5 1.5 0 0 1 15 5v1.5"/><path d="M6.5 6.5 7.3 19a2 2 0 0 0 2 1.8h5.4a2 2 0 0 0 2-1.8l.8-12.5"/><path d="M10.2 10.5v6.3M13.8 10.5v6.3"/>',
+  search: '<circle cx="10.5" cy="10.5" r="6.5"/><path d="m20 20-4.8-4.8"/>',
+  moon: '<path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a7 7 0 0 0 10.5 10.5Z"/>',
+  sun: '<circle cx="12" cy="12" r="4"/><path d="M12 3v2M12 19v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M3 12h2M19 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4"/>',
+  upload: '<path d="M12 15V4M8 8l4-4 4 4"/><path d="M4.5 15v3.5a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V15"/>',
+  download: '<path d="M12 4v11M8 11l4 4 4-4"/><path d="M4.5 15v3.5a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V15"/>',
+};
+
+function icon(name, cls = "icon") {
+  return `<svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true">${ICONS[name] || ""}</svg>`;
+}
+
 const NAV_ITEMS = [
-  { route: "dashboard", icon: "🏠", label: "Início", primary: true },
-  { route: "disciplinas", icon: "📚", label: "Matérias", primary: true },
-  { route: "tarefas", icon: "✅", label: "Tarefas", primary: true },
-  { route: "calendario", icon: "📅", label: "Agenda", primary: true },
-  { route: "avaliacoes", icon: "📝", label: "Avaliações" },
-  { route: "estudos", icon: "🎯", label: "Estudos" },
-  { route: "pomodoro", icon: "🍅", label: "Pomodoro" },
-  { route: "estatisticas", icon: "📊", label: "Estatísticas" },
-  { route: "grade", icon: "🎓", label: "Grade" },
-  { route: "config", icon: "⚙️", label: "Config." },
+  { route: "dashboard", icon: "home", label: "Início", primary: true },
+  { route: "disciplinas", icon: "book", label: "Matérias", primary: true, group: "Estudos" },
+  { route: "avaliacoes", icon: "file", label: "Avaliações", group: "Estudos" },
+  { route: "tarefas", icon: "check", label: "Tarefas", primary: true, group: "Estudos" },
+  { route: "calendario", icon: "calendar", label: "Agenda", primary: true, group: "Planejamento" },
+  { route: "estudos", icon: "target", label: "Plano de estudos", group: "Planejamento" },
+  { route: "pomodoro", icon: "clock", label: "Pomodoro", group: "Planejamento" },
+  { route: "estatisticas", icon: "bars", label: "Estatísticas", group: "Análise" },
+  { route: "grade", icon: "grid", label: "Grade curricular", group: "Análise" },
+  { route: "config", icon: "sliders", label: "Configurações" },
 ];
 
 const Pages = {}; // cada módulo de página registra { render(container, param) }
@@ -42,6 +70,7 @@ const App = (() => {
     const fab = document.getElementById("fab");
     if (route === "tarefas" && Pages.tarefas && Pages.tarefas.onFab) {
       fab.hidden = false;
+      fab.innerHTML = icon("plus");
       fab.onclick = Pages.tarefas.onFab;
     } else {
       fab.hidden = true;
@@ -58,15 +87,15 @@ const App = (() => {
     const view = document.getElementById("view");
     const page = Pages[route];
     if (!page) {
-      view.innerHTML = `<div class="container"><div class="empty-state"><span class="empty-emoji">🤔</span>Página não encontrada.</div></div>`;
+      view.innerHTML = `<div class="container"><div class="empty-state"><p>Página não encontrada.</p></div></div>`;
       return;
     }
-    view.innerHTML = `<div class="container" id="page-${route}"><div class="empty-state">Carregando…</div></div>`;
+    view.innerHTML = `<div class="container" id="page-${route}"><p class="empty-state">Carregando…</p></div>`;
     try {
       await page.render(document.getElementById(`page-${route}`), param);
       updateFab(route);
     } catch (e) {
-      view.querySelector(".container").innerHTML = `<div class="empty-state"><span class="empty-emoji">⚠️</span>${e.message}</div>`;
+      view.querySelector(".container").innerHTML = `<div class="empty-state"><p>${e.message}</p></div>`;
     }
   }
 
@@ -81,7 +110,7 @@ const UI = (() => {
     root.innerHTML = `<div class="modal-sheet" role="dialog" aria-modal="true">
       <div class="modal-header">
         <h3>${title}</h3>
-        <button type="button" class="icon-btn" id="modal-close" aria-label="Fechar">✕</button>
+        <button type="button" class="icon-btn" id="modal-close" aria-label="Fechar">${icon("x")}</button>
       </div>
       <div class="modal-body">${bodyHtml}</div>
       ${actionsHtml ? `<div class="modal-actions"><button type="button" class="btn" id="modal-cancel">Cancelar</button>${actionsHtml}</div>` : ""}
@@ -128,7 +157,7 @@ function aplicarTemaSalvo() {
   const atualizarIcone = () => {
     const attr = document.documentElement.getAttribute("data-theme");
     const escuro = attr === "dark" || (!attr && window.matchMedia("(prefers-color-scheme: dark)").matches);
-    btn.textContent = escuro ? "☀️" : "🌙";
+    btn.innerHTML = icon(escuro ? "sun" : "moon");
   };
   atualizarIcone();
   btn.addEventListener("click", () => {
@@ -145,36 +174,43 @@ function aplicarTemaSalvo() {
 registerPage("config", {
   async render(container) {
     container.innerHTML = `
-      <h1>Configurações</h1>
+      <div class="page-header"><h1>Configurações</h1></div>
+      <p class="page-subtitle">Aparência e dados do sistema.</p>
 
-      <div class="card" style="margin-bottom:16px;">
-        <h3>🎨 Aparência</h3>
-        <p class="foco-sub">Escolha entre tema claro, escuro ou o padrão do sistema.</p>
-        <div class="field-row">
-          <button class="btn" data-tema="claro">☀️ Claro</button>
-          <button class="btn" data-tema="escuro">🌙 Escuro</button>
-          <button class="btn" data-tema="sistema">🖥️ Sistema</button>
+      <div class="section">
+        <div class="section-header"><h2>Aparência</h2></div>
+        <div class="panel">
+          <p class="field-hint" style="margin-top:0;">Tema claro, escuro ou o padrão do sistema operacional.</p>
+          <div class="field-row">
+            <button class="btn" data-tema="claro">Claro</button>
+            <button class="btn" data-tema="escuro">Escuro</button>
+            <button class="btn" data-tema="sistema">Sistema</button>
+          </div>
         </div>
       </div>
 
-      <div class="card" style="margin-bottom:16px;">
-        <h3>📥 Importar planilha (.xlsx)</h3>
-        <p class="foco-sub">A importação pode adicionar ou atualizar dados existentes.</p>
-        <div class="field">
-          <label for="modo-importacao">Modo de importação</label>
-          <select id="modo-importacao">
-            <option value="add">Adicionar (mantém o que já existe, só insere novo)</option>
-            <option value="update" selected>Atualizar (insere novos e atualiza existentes)</option>
-            <option value="replace">Substituir (apaga tudo e importa do zero)</option>
-          </select>
+      <div class="section">
+        <div class="section-header"><h2>Importar planilha</h2></div>
+        <div class="panel">
+          <p class="field-hint" style="margin-top:0;">A importação pode adicionar ou atualizar dados existentes.</p>
+          <div class="field">
+            <label for="modo-importacao">Modo de importação</label>
+            <select id="modo-importacao">
+              <option value="add">Adicionar — mantém o que já existe, só insere novo</option>
+              <option value="update" selected>Atualizar — insere novos e atualiza existentes</option>
+              <option value="replace">Substituir — apaga tudo e importa do zero</option>
+            </select>
+          </div>
+          <button class="btn btn-primary" id="btn-importar">${icon("upload")} Selecionar arquivo .xlsx</button>
         </div>
-        <button class="btn btn-primary btn-block" id="btn-importar">Selecionar arquivo .xlsx</button>
       </div>
 
-      <div class="card">
-        <h3>📤 Exportar dados</h3>
-        <p class="foco-sub">Gera um novo arquivo .xlsx com os dados atuais do sistema.</p>
-        <button class="btn btn-primary btn-block" id="btn-exportar">Exportar dados</button>
+      <div class="section">
+        <div class="section-header"><h2>Exportar dados</h2></div>
+        <div class="panel">
+          <p class="field-hint" style="margin-top:0;">Gera um novo arquivo .xlsx com os dados atuais do sistema.</p>
+          <button class="btn" id="btn-exportar">${icon("download")} Exportar dados</button>
+        </div>
       </div>
     `;
 
@@ -227,12 +263,33 @@ document.addEventListener("DOMContentLoaded", () => {
   App.render();
 });
 
+function navItemHtml(item) {
+  return `<button type="button" class="nav-item" data-route="${item.route}">
+    ${icon(item.icon)}<span class="nav-label">${item.label}</span>
+  </button>`;
+}
+
 function buildSidebarAndNav() {
   const sidebarContainer = document.getElementById("sidebar-items");
-  sidebarContainer.innerHTML = NAV_ITEMS.map((item) => `
-    <button type="button" class="nav-item" data-route="${item.route}">
-      <span class="nav-icon">${item.icon}</span><span class="nav-label">${item.label}</span>
-    </button>`).join("");
+  const semGrupo = NAV_ITEMS.filter((n) => !n.group && n.route !== "config");
+  const grupos = [];
+  NAV_ITEMS.forEach((item) => {
+    if (!item.group) return;
+    let g = grupos.find((x) => x.nome === item.group);
+    if (!g) { g = { nome: item.group, itens: [] }; grupos.push(g); }
+    g.itens.push(item);
+  });
+  const config = NAV_ITEMS.find((n) => n.route === "config");
+
+  let html = `<div class="nav-group">${semGrupo.map((i) => navItemHtml(i)).join("")}</div>`;
+  grupos.forEach((g) => {
+    html += `<div class="nav-group">
+      <div class="nav-group-label">${g.nome}</div>
+      ${g.itens.map((i) => navItemHtml(i)).join("")}
+    </div>`;
+  });
+  html += `<div class="nav-divider"></div><div class="nav-group">${navItemHtml(config)}</div>`;
+  sidebarContainer.innerHTML = html;
   sidebarContainer.querySelectorAll(".nav-item").forEach((el) => {
     el.addEventListener("click", () => { location.hash = `#/${el.dataset.route}`; });
   });
@@ -241,10 +298,10 @@ function buildSidebarAndNav() {
   const bottomNav = document.getElementById("bottom-nav");
   bottomNav.innerHTML = primary.map((item) => `
     <button type="button" class="nav-item" data-route="${item.route}">
-      <span class="nav-icon">${item.icon}</span><span>${item.label}</span>
+      ${icon(item.icon)}<span>${item.label}</span>
     </button>`).join("") + `
     <button type="button" class="nav-item" data-route="mais">
-      <span class="nav-icon">⋯</span><span>Mais</span>
+      ${icon("more")}<span>Mais</span>
     </button>`;
   bottomNav.querySelectorAll('.nav-item:not([data-route="mais"])').forEach((el) => {
     el.addEventListener("click", () => { location.hash = `#/${el.dataset.route}`; });
@@ -255,7 +312,7 @@ function buildSidebarAndNav() {
       title: "Mais opções",
       bodyHtml: `<div class="sheet-grid">${secundarios.map((item) => `
         <button type="button" class="nav-item" data-route="${item.route}">
-          <span class="nav-icon">${item.icon}</span><span>${item.label}</span>
+          ${icon(item.icon)}<span>${item.label}</span>
         </button>`).join("")}</div>`,
     });
     document.querySelectorAll("#modal-root .sheet-grid .nav-item").forEach((el) => {

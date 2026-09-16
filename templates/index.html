@@ -4,7 +4,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Meu Sistema de Estudos</title>
-<meta name="theme-color" content="#6366f1">
+<meta name="theme-color" content="#2563eb">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script>
   (function () {
     try {
@@ -20,15 +23,15 @@
 <body>
 <div id="app-shell">
   <header id="topbar">
-    <div class="brand">📚 <span>Meu Sistema de Estudos</span></div>
+    <div class="brand"><span class="brand-mark">ME</span> <span>Meu Sistema de Estudos</span></div>
     <div class="actions">
-      <button id="theme-toggle" class="icon-btn" type="button" aria-label="Alternar tema">🌙</button>
+      <button id="theme-toggle" class="icon-btn" type="button" aria-label="Alternar tema"></button>
     </div>
   </header>
 
   <div id="layout">
     <nav id="sidebar" aria-label="Navegação principal">
-      <div class="brand">📚 <span class="brand-text">Estudos</span></div>
+      <div class="brand"><span class="brand-mark">ME</span> <span class="brand-text">Meus Estudos</span></div>
       <div id="sidebar-items"></div>
     </nav>
 
@@ -36,7 +39,7 @@
   </div>
 
   <nav id="bottom-nav" aria-label="Navegação principal"></nav>
-  <button id="fab" type="button" aria-label="Adicionar" hidden>+</button>
+  <button id="fab" type="button" aria-label="Adicionar" hidden></button>
 </div>
 
 <div id="modal-root" hidden aria-hidden="true"></div>

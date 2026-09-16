@@ -1,96 +1,56 @@
 /* Meu Sistema de Estudos - Avaliações */
 
 const TIPO_AVAL_LABEL = { prova: "Prova", trabalho: "Trabalho", lista: "Lista", seminario: "Seminário", projeto: "Projeto" };
-const TIPO_AVAL_ICON = { prova: "📄", trabalho: "📦", lista: "📋", seminario: "🎤", projeto: "🛠️" };
 const PRIORIDADE_LABEL = { alta: "Alta", media: "Média", baixa: "Baixa" };
-const PRIORIDADE_BADGE = { alta: "badge-danger", media: "badge-warning", baixa: "badge-info" };
-let avaliacoesViewMode = "cards";
+const PRIORIDADE_BADGE = { alta: "badge-danger", media: "badge-warning", baixa: "badge-neutral" };
 let avaliacoesFiltroStatus = "";
 
 registerPage("avaliacoes", {
   async render(container) {
-    const disciplinas = await Api.listarDisciplinas();
     const avaliacoes = await Api.listarAvaliacoes(avaliacoesFiltroStatus ? { status: avaliacoesFiltroStatus } : {});
 
     container.innerHTML = `
-      <div class="section-title">
+      <div class="page-header">
         <h1>Avaliações</h1>
-        <div class="view-toggle">
-          <button data-mode="cards" class="${avaliacoesViewMode === "cards" ? "active" : ""}">▦ Cards</button>
-          <button data-mode="table" class="${avaliacoesViewMode === "table" ? "active" : ""}">☷ Tabela</button>
-        </div>
+        <button class="btn btn-primary btn-sm" id="btn-nova-avaliacao">${icon("plus")} Nova avaliação</button>
       </div>
-      <div class="tabs">
+      <div class="filter-row">
         ${["", "pendente", "concluida"].map((s) => `
-          <button class="tab-btn ${avaliacoesFiltroStatus === s ? "active" : ""}" data-status="${s}">
+          <button class="filter-chip ${avaliacoesFiltroStatus === s ? "active" : ""}" data-status="${s}">
             ${s === "" ? "Todas" : s === "pendente" ? "Pendentes" : "Concluídas"}
           </button>`).join("")}
       </div>
-      <button class="btn btn-primary btn-block" id="btn-nova-avaliacao" style="margin-bottom:16px;">+ Nova avaliação</button>
 
-      ${avaliacoes.length ? "" : emptyState("📝", "Nenhuma avaliação cadastrada.")}
-
-      <div id="aval-cards" class="cards-grid" ${avaliacoesViewMode === "cards" ? "" : "hidden"}>
-        ${avaliacoes.map((a) => avaliacaoCardHtml(a, disciplinas)).join("")}
-      </div>
-      <div id="aval-table" class="scroll-x" ${avaliacoesViewMode === "table" ? "" : "hidden"}>
-        <table class="data-table">
-          <thead><tr><th>Matéria</th><th>Tipo</th><th>Título</th><th>Data</th><th>Peso</th><th>Nota</th><th>Status</th><th></th></tr></thead>
-          <tbody>
-            ${avaliacoes.map((a) => `
-              <tr>
-                <td>${a.disciplina_nome}</td>
-                <td>${TIPO_AVAL_LABEL[a.tipo] || a.tipo}</td>
-                <td>${a.titulo}</td>
-                <td>${formatarData(a.data)}</td>
-                <td>${a.peso}</td>
-                <td>${a.nota ?? "—"}</td>
-                <td><span class="badge ${a.status === "concluida" ? "badge-success" : "badge-warning"}">${a.status === "concluida" ? "Concluída" : "Pendente"}</span></td>
-                <td><button class="btn btn-sm" data-editar="${a.id}">Editar</button></td>
-              </tr>`).join("")}
-          </tbody>
-        </table>
+      <div class="list">
+        ${avaliacoes.length ? avaliacoes.map((a) => avaliacaoRowHtml(a)).join("") : `<p class="empty-state">Nenhuma avaliação cadastrada.</p>`}
       </div>
     `;
 
-    container.querySelectorAll("[data-mode]").forEach((btn) => btn.addEventListener("click", () => {
-      avaliacoesViewMode = btn.dataset.mode;
-      App.refresh();
-    }));
     container.querySelectorAll("[data-status]").forEach((btn) => btn.addEventListener("click", () => {
       avaliacoesFiltroStatus = btn.dataset.status;
       App.refresh();
     }));
     container.querySelector("#btn-nova-avaliacao").addEventListener("click", () => abrirFormAvaliacao());
-    container.querySelectorAll("[data-editar]").forEach((btn) => btn.addEventListener("click", async () => {
-      const a = avaliacoes.find((x) => String(x.id) === btn.dataset.editar);
-      abrirFormAvaliacao(a);
-    }));
-    container.querySelectorAll(".aval-card").forEach((card) => card.addEventListener("click", async () => {
-      const a = avaliacoes.find((x) => String(x.id) === card.dataset.id);
+    container.querySelectorAll(".list-row[data-id]").forEach((row) => row.addEventListener("click", () => {
+      const a = avaliacoes.find((x) => String(x.id) === row.dataset.id);
       abrirFormAvaliacao(a);
     }));
   },
 });
 
-function avaliacaoCardHtml(a) {
+function avaliacaoRowHtml(a) {
   const dias = a.data ? diasRestantes(a.data) : null;
-  return `<div class="card aval-card" data-id="${a.id}" role="button" tabindex="0">
-    <div class="disciplina-top">
-      <span style="font-size:22px;">${TIPO_AVAL_ICON[a.tipo] || "📄"}</span>
-      <div>
-        <h3>${a.titulo}</h3>
-        <div class="disciplina-meta"><span>${a.disciplina_nome}</span><span class="badge ${PRIORIDADE_BADGE[a.prioridade]}">${PRIORIDADE_LABEL[a.prioridade]}</span></div>
-      </div>
+  let prazoTexto = "Sem data";
+  if (dias !== null) prazoTexto = dias >= 0 ? `Faltam ${dias} dia(s)` : `Há ${-dias} dia(s)`;
+  return `<div class="list-row" data-id="${a.id}">
+    <div class="list-row-main">
+      <div class="list-row-title">${a.titulo}</div>
+      <div class="list-row-sub">${a.disciplina_nome} · ${TIPO_AVAL_LABEL[a.tipo] || a.tipo}</div>
     </div>
-    <div class="disciplina-numeros">
-      <div><div class="num-label">Data</div><div class="num-value" style="font-size:14px;">${formatarData(a.data)}</div></div>
-      <div><div class="num-label">Peso</div><div class="num-value" style="font-size:14px;">${a.peso}</div></div>
-      <div><div class="num-label">Nota</div><div class="num-value" style="font-size:14px;">${a.nota ?? "—"}</div></div>
-    </div>
-    <div class="disciplina-meta">
-      <span class="badge ${a.status === "concluida" ? "badge-success" : "badge-warning"}">${a.status === "concluida" ? "Concluída" : "Pendente"}</span>
-      <span>${dias !== null ? (dias >= 0 ? `Faltam ${dias} dia(s)` : `Há ${-dias} dia(s)`) : ""}</span>
+    <div class="list-row-meta">
+      <span class="badge ${PRIORIDADE_BADGE[a.prioridade]}">${PRIORIDADE_LABEL[a.prioridade]}</span>
+      <span class="badge ${a.status === "concluida" ? "badge-success" : "badge-neutral"}">${a.status === "concluida" ? "Concluída" : "Pendente"}</span>
+      <span style="min-width:90px; display:inline-block; text-align:right;">${formatarData(a.data)}</span>
     </div>
   </div>`;
 }
@@ -113,11 +73,8 @@ async function abrirFormAvaliacao(avaliacao = null, disciplinaIdFixo = null) {
   if (!disciplinas.length) {
     UI.openModal({
       title: "Nenhuma matéria cadastrada",
-      bodyHtml: `<div class="empty-state">
-        <span class="empty-emoji">📚</span>
-        Toda avaliação pertence a uma matéria. Cadastre sua primeira matéria antes de criar uma avaliação.
-      </div>`,
-      actionsHtml: `<button class="btn btn-primary" id="btn-ir-cadastrar-materia">+ Nova matéria</button>`,
+      bodyHtml: `<p class="empty-state">Toda avaliação pertence a uma matéria. Cadastre sua primeira matéria antes de criar uma avaliação.</p>`,
+      actionsHtml: `<button class="btn btn-primary" id="btn-ir-cadastrar-materia">Nova matéria</button>`,
     });
     document.getElementById("btn-ir-cadastrar-materia").addEventListener("click", () => {
       UI.closeModal();

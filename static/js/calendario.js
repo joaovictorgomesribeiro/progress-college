@@ -13,19 +13,20 @@ registerPage("calendario", {
     const eventosPorData = agruparEventosPorData(avaliacoes, tarefas);
 
     container.innerHTML = `
-      <h1>Agenda</h1>
-      <div class="card" style="margin-bottom:16px;">
-        <div class="section-title" style="margin:0 0 10px;">
-          <button class="icon-btn" id="cal-prev">‹</button>
+      <div class="page-header"><h1>Agenda</h1></div>
+
+      <div class="panel" style="margin-bottom:var(--space-5);">
+        <div class="page-header" style="margin-bottom:var(--space-3);">
+          <button class="icon-btn" id="cal-prev" aria-label="Mês anterior">${icon("arrowLeft")}</button>
           <h2>${MESES_NOMES[calMesAtual]} ${calAnoAtual}</h2>
-          <button class="icon-btn" id="cal-next">›</button>
+          <button class="icon-btn" id="cal-next" aria-label="Próximo mês" style="transform:scaleX(-1);">${icon("arrowLeft")}</button>
         </div>
         <div class="cal-weekday-row">${["D", "S", "T", "Q", "Q", "S", "S"].map((d) => `<span>${d}</span>`).join("")}</div>
         <div class="cal-month-grid" id="cal-grid"></div>
       </div>
 
-      <div class="section-title"><h2>${formatarDataLonga(calDataSelecionada)}</h2></div>
-      <div class="card" id="cal-agenda"></div>
+      <div class="section-header"><h2>${formatarDataLonga(calDataSelecionada)}</h2></div>
+      <div class="list" id="cal-agenda"></div>
     `;
 
     renderGridMes(container, eventosPorData);
@@ -48,13 +49,13 @@ function agruparEventosPorData(avaliacoes, tarefas) {
     if (!a.data) return;
     (map[a.data] = map[a.data] || []).push({
       tipo: "avaliacao", titulo: `${TIPO_AVAL_LABEL[a.tipo] || "Avaliação"} de ${a.disciplina_nome}`,
-      sub: a.titulo, hora: null, emoji: "🔴",
+      sub: a.titulo, hora: null, dotClasse: "dot-danger",
     });
   });
   tarefas.forEach((t) => {
     if (!t.prazo || t.status === "concluida") return;
     (map[t.prazo] = map[t.prazo] || []).push({
-      tipo: "tarefa", titulo: t.nome, sub: t.disciplina_nome || "Geral", hora: "23:59", emoji: "📝",
+      tipo: "tarefa", titulo: t.nome, sub: t.disciplina_nome || "Geral", hora: "23:59", dotClasse: "dot-info",
     });
   });
   return map;
@@ -91,12 +92,13 @@ function renderAgendaDia(container, eventosPorData) {
   agenda.innerHTML = eventos.length
     ? eventos.map((e) => `<div class="agenda-item">
         <div class="agenda-time">${e.hora || "—"}</div>
+        <span class="dot ${e.dotClasse}" style="margin-top:6px;"></span>
         <div>
-          <div style="font-weight:700;">${e.emoji} ${e.titulo}</div>
-          <div class="foco-sub">${e.sub}</div>
+          <div style="font-weight:500;">${e.titulo}</div>
+          <div class="list-row-sub">${e.sub}</div>
         </div>
       </div>`).join("")
-    : `<div class="empty-state"><span class="empty-emoji">🗓️</span>Nenhum evento neste dia.</div>`;
+    : `<p class="empty-state">Nenhum evento neste dia.</p>`;
 }
 
 function formatarDataLonga(iso) {

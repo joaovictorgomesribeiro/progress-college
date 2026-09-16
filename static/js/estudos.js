@@ -16,54 +16,64 @@ registerPage("estudos", {
     const pct = Math.min(100, Math.round((horasSemana / metaHoras) * 100));
 
     container.innerHTML = `
-      <h1>Estudos</h1>
+      <div class="page-header"><h1>Plano de estudos</h1></div>
 
-      <div class="card" style="margin-bottom:16px;">
-        <h3>Meta da semana</h3>
-        <div class="progress-bar" style="margin:10px 0;"><span style="width:${pct}%"></span></div>
-        <div class="foco-sub">${horasSemana.toFixed(1)}h / ${metaHoras}h</div>
+      <div class="panel" style="margin-bottom:var(--space-6);">
+        <div class="list-row-sub" style="margin-bottom:var(--space-2);">Meta da semana</div>
+        <div class="progress-bar" style="margin-bottom:var(--space-2);"><span style="width:${pct}%"></span></div>
+        <div class="field-hint" style="margin:0;">${horasSemana.toFixed(1)}h de ${metaHoras}h</div>
       </div>
 
-      <div class="section-title"><h2>🎯 Metas</h2><button class="btn btn-sm" id="btn-nova-meta">+ Nova meta</button></div>
-      <div class="cards-grid" style="margin-bottom:20px;">
-        ${metas.length ? metas.map(metaCardHtml).join("") : emptyState("🎯", "Nenhuma meta cadastrada.")}
+      <div class="section">
+        <div class="section-header"><h2>Metas</h2><button class="btn btn-sm" id="btn-nova-meta">${icon("plus")} Nova meta</button></div>
+        <div class="list">
+          ${metas.length ? metas.map(metaRowHtml).join("") : `<p class="empty-state">Nenhuma meta cadastrada.</p>`}
+        </div>
       </div>
 
-      <div class="section-title"><h2>📖 Sessões recentes</h2><button class="btn btn-sm" id="btn-nova-sessao">+ Registrar sessão</button></div>
-      <div class="card" style="padding:4px 16px;">
-        ${sessoes.length ? sessoes.slice(0, 20).map((s) => `
-          <div class="agenda-item">
-            <div class="agenda-time">${formatarData(s.data)}</div>
-            <div style="flex:1;">
-              <div style="font-weight:600;">${s.disciplina_nome || "Estudo geral"} · ${TIPO_SESSAO_LABEL[s.tipo] || s.tipo}</div>
-              <div class="foco-sub">${s.duracao_min} min ${s.observacoes ? "· " + s.observacoes : ""}</div>
-            </div>
-            <button class="icon-btn btn-sm" data-excluir-estudo="${s.id}" aria-label="Excluir sessão">🗑️</button>
-          </div>`).join("") : emptyState("🎯", "Nenhuma sessão registrada ainda.")}
+      <div class="section">
+        <div class="section-header"><h2>Sessões recentes</h2><button class="btn btn-sm" id="btn-nova-sessao">${icon("plus")} Registrar</button></div>
+        <div class="list">
+          ${sessoes.length ? sessoes.slice(0, 20).map((s) => `
+            <div class="list-row" style="cursor:default;">
+              <div class="list-row-main">
+                <div class="list-row-title">${s.disciplina_nome || "Estudo geral"}</div>
+                <div class="list-row-sub">${TIPO_SESSAO_LABEL[s.tipo] || s.tipo}${s.observacoes ? " · " + s.observacoes : ""}</div>
+              </div>
+              <div class="list-row-meta">${formatarData(s.data)} · ${s.duracao_min} min</div>
+              <button class="icon-btn" data-excluir-estudo="${s.id}" aria-label="Excluir sessão">${icon("trash")}</button>
+            </div>`).join("") : `<p class="empty-state">Nenhuma sessão registrada ainda.</p>`}
+        </div>
       </div>
     `;
 
     container.querySelector("#btn-nova-sessao").addEventListener("click", () => abrirFormEstudo());
     container.querySelector("#btn-nova-meta").addEventListener("click", () => abrirFormMeta());
-    container.querySelectorAll("[data-excluir-estudo]").forEach((btn) => btn.addEventListener("click", async () => {
+    container.querySelectorAll("[data-excluir-estudo]").forEach((btn) => btn.addEventListener("click", async (e) => {
+      e.stopPropagation();
       if (!UI.confirmar("Excluir esta sessão de estudo?")) return;
       await Api.excluirEstudo(btn.dataset.excluirEstudo);
       App.refresh();
     }));
-    container.querySelectorAll(".meta-card").forEach((card) => card.addEventListener("click", () => {
-      const m = metas.find((x) => String(x.id) === card.dataset.id);
+    container.querySelectorAll(".list-row[data-id]").forEach((row) => row.addEventListener("click", () => {
+      const m = metas.find((x) => String(x.id) === row.dataset.id);
       abrirFormMeta(m);
     }));
   },
 });
 
-function metaCardHtml(m) {
+function metaRowHtml(m) {
   const pct = m.alvo ? Math.min(100, Math.round((m.atual / m.alvo) * 100)) : 0;
-  return `<div class="card meta-card" data-id="${m.id}" role="button" tabindex="0">
-    <div class="disciplina-meta"><h3 style="margin:0;">${m.titulo}</h3><span class="badge ${m.status === "concluida" ? "badge-success" : "badge-info"}">${m.status === "concluida" ? "Concluída" : "Ativa"}</span></div>
-    <div class="foco-sub">${m.disciplina_nome || "Geral"} · ${TIPO_META_LABEL[m.tipo]}</div>
-    <div class="progress-bar" style="margin:10px 0;"><span style="width:${pct}%"></span></div>
-    <div class="foco-sub">${m.atual} / ${m.alvo} ${m.unidade || ""}</div>
+  return `<div class="list-row" data-id="${m.id}">
+    <div class="list-row-main">
+      <div class="list-row-title">${m.titulo}</div>
+      <div class="list-row-sub">${m.disciplina_nome || "Geral"} · ${TIPO_META_LABEL[m.tipo]}</div>
+      <div class="progress-bar" style="margin-top:6px; max-width:220px;"><span style="width:${pct}%"></span></div>
+    </div>
+    <div class="list-row-meta">
+      <span class="badge ${m.status === "concluida" ? "badge-success" : "badge-info"}">${m.status === "concluida" ? "Concluída" : "Ativa"}</span>
+      <span>${m.atual} / ${m.alvo} ${m.unidade || ""}</span>
+    </div>
   </div>`;
 }
 

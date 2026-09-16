@@ -18,7 +18,7 @@ registerPage("pomodoro", {
   async render(container) {
     const disciplinas = await Api.listarDisciplinas();
     container.innerHTML = `
-      <h1>Pomodoro</h1>
+      <div class="page-header"><h1>Pomodoro</h1></div>
       <div class="pomodoro-wrap">
         <div class="field" style="width:100%; max-width:280px;">
           <label for="pom-disciplina">Matéria</label>
@@ -40,7 +40,7 @@ registerPage("pomodoro", {
         <div class="pomodoro-ring" id="pom-ring" style="--pct:0;">
           <div class="pomodoro-ring-inner">
             <div class="pomodoro-timer" id="pom-display">25:00</div>
-            <div id="pom-disciplina-nome" class="foco-sub">Estudo geral</div>
+            <div id="pom-disciplina-nome" class="field-hint">Estudo geral</div>
           </div>
         </div>
 
@@ -48,7 +48,7 @@ registerPage("pomodoro", {
           <button class="btn btn-primary" id="btn-pom-toggle">${pomodoro.rodando ? "Pausar" : "Iniciar"}</button>
           <button class="btn" id="btn-pom-reset">Reiniciar</button>
         </div>
-        <div class="foco-sub">Sessão #${pomodoro.sessaoNumero}${pomodoro.emPausa ? " · Pausa" : ""}</div>
+        <div class="field-hint">Sessão #${pomodoro.sessaoNumero}${pomodoro.emPausa ? " · Pausa" : ""}</div>
       </div>
     `;
 
@@ -118,7 +118,7 @@ async function tick() {
           duracao_min: pomodoro.foco, tipo: "pomodoro",
           observacoes: `Sessão #${pomodoro.sessaoNumero} de pomodoro`,
         });
-        UI.showToast("Sessão de foco registrada! Hora da pausa.");
+        UI.showToast("Sessão de foco registrada. Hora da pausa.");
       } catch (e) { /* segue mesmo se falhar o registro */ }
       pomodoro.emPausa = true;
       pomodoro.restanteSeg = pomodoro.pausa * 60;
@@ -126,7 +126,7 @@ async function tick() {
       pomodoro.emPausa = false;
       pomodoro.sessaoNumero++;
       pomodoro.restanteSeg = pomodoro.foco * 60;
-      UI.showToast("Pausa terminada. Bora focar de novo!");
+      UI.showToast("Pausa terminada. Hora de focar novamente.");
     }
   }
   atualizarDisplay();
@@ -150,6 +150,6 @@ function atualizarDisplay() {
   if (toggleBtn && pomodoro.restanteSeg === (pomodoro.emPausa ? pomodoro.pausa : pomodoro.foco) * 60 && !pomodoro.rodando) {
     toggleBtn.textContent = "Iniciar";
   }
-  const sessaoLabel = container.querySelector(".pomodoro-wrap > .foco-sub");
+  const sessaoLabel = container.querySelector(".pomodoro-wrap > .field-hint");
   if (sessaoLabel) sessaoLabel.textContent = `Sessão #${pomodoro.sessaoNumero}${pomodoro.emPausa ? " · Pausa" : ""}`;
 }

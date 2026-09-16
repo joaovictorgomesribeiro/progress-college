@@ -1,8 +1,10 @@
 /* Meu Sistema de Estudos - Disciplinas (lista, detalhe, CRUD) */
 
-const STATUS_DISC_LABEL = { concluida: "Concluída", andamento: "Em andamento", planejada: "Planejada", bloqueada: "Bloqueada" };
-const STATUS_DISC_BADGE = { concluida: "badge-success", andamento: "badge-info", planejada: "badge-warning", bloqueada: "badge-danger" };
-let disciplinasViewMode = "cards";
+const STATUS_DISC_LABEL = { concluida: "Concluída", andamento: "Cursando", planejada: "Planejada", bloqueada: "Bloqueada" };
+const STATUS_DISC_BADGE = { concluida: "badge-success", andamento: "badge-info", planejada: "badge-neutral", bloqueada: "badge-danger" };
+let disciplinasViewMode = "lista";
+let disciplinasBusca = "";
+let disciplinasFiltroStatus = "";
 
 registerPage("disciplinas", {
   async render(container, param) {
@@ -15,41 +17,91 @@ registerPage("disciplinas", {
 });
 
 async function renderDisciplinasLista(container) {
-  const disciplinas = await Api.listarDisciplinas();
+  const todasDisciplinas = await Api.listarDisciplinas();
 
   container.innerHTML = `
-    <div class="section-title">
+    <div class="page-header">
       <h1>Matérias</h1>
-      <div class="view-toggle">
-        <button data-mode="cards" class="${disciplinasViewMode === "cards" ? "active" : ""}">▦ Cards</button>
-        <button data-mode="table" class="${disciplinasViewMode === "table" ? "active" : ""}">☷ Tabela</button>
+      <button class="btn btn-primary btn-sm" id="btn-nova-disciplina">${icon("plus")} Nova matéria</button>
+    </div>
+    <p class="page-subtitle">${todasDisciplinas.length} disciplina${todasDisciplinas.length === 1 ? "" : "s"} cadastrada${todasDisciplinas.length === 1 ? "" : "s"}.</p>
+
+    ${todasDisciplinas.length ? `
+      <div class="search-row">
+        <div class="search-box">${icon("search")}<input type="search" id="busca-disciplina" placeholder="Buscar matéria..." value="${disciplinasBusca}"></div>
+        <div class="view-toggle">
+          <button data-mode="lista" class="${disciplinasViewMode === "lista" ? "active" : ""}">Lista</button>
+          <button data-mode="tabela" class="${disciplinasViewMode === "tabela" ? "active" : ""}">Tabela</button>
+        </div>
       </div>
-    </div>
-    <button class="btn btn-primary btn-block" id="btn-nova-disciplina" style="margin-bottom:16px;">+ Nova matéria</button>
+      <div class="filter-row">
+        ${["", "andamento", "concluida", "planejada", "bloqueada"].map((s) => `
+          <button class="filter-chip ${disciplinasFiltroStatus === s ? "active" : ""}" data-status="${s}">${s === "" ? "Todas" : STATUS_DISC_LABEL[s]}</button>
+        `).join("")}
+      </div>
+    ` : ""}
 
-    ${disciplinas.length ? "" : emptyState("📚", "Nenhuma matéria cadastrada ainda.")}
-
-    <div id="disc-cards" class="cards-grid" ${disciplinasViewMode === "cards" ? "" : "hidden"}>
-      ${disciplinas.map(disciplinaCardHtml).join("")}
-    </div>
-
-    <div id="disc-table" class="scroll-x" ${disciplinasViewMode === "table" ? "" : "hidden"}>
-      <table class="data-table">
-        <thead><tr><th>Nome</th><th>Período</th><th>Status</th><th>Média</th><th>Frequência</th><th></th></tr></thead>
-        <tbody>
-          ${disciplinas.map((d) => `
-            <tr>
-              <td>${d.nome}</td>
-              <td>${d.periodo}º</td>
-              <td><span class="badge ${STATUS_DISC_BADGE[d.status] || ""}">${STATUS_DISC_LABEL[d.status] || d.status}</span></td>
-              <td>${d.media != null ? d.media.toFixed(1) : "—"}</td>
-              <td>${d.frequencia != null ? d.frequencia + "%" : "—"}</td>
-              <td><button class="btn btn-sm" data-ver="${d.id}">Ver →</button></td>
-            </tr>`).join("")}
-        </tbody>
-      </table>
-    </div>
+    <div id="disc-conteudo"></div>
   `;
+
+  if (!todasDisciplinas.length) {
+    container.querySelector("#disc-conteudo").innerHTML = `
+      <div class="empty-state">
+        <p>Você ainda não possui matérias cadastradas.<br>Comece adicionando sua primeira disciplina.</p>
+        <button class="btn btn-primary" id="btn-nova-disciplina-vazio">${icon("plus")} Adicionar matéria</button>
+      </div>`;
+    container.querySelector("#btn-nova-disciplina-vazio").addEventListener("click", () => abrirFormDisciplina());
+  } else {
+    renderDisciplinasConteudo(container, todasDisciplinas);
+  }
+
+  container.querySelector("#btn-nova-disciplina").addEventListener("click", () => abrirFormDisciplina());
+}
+
+function normalizarBusca(texto) {
+  return (texto || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+}
+
+function renderDisciplinasConteudo(container, todasDisciplinas) {
+  const termo = normalizarBusca(disciplinasBusca.trim());
+  const filtradas = todasDisciplinas.filter((d) => {
+    const bateStatus = !disciplinasFiltroStatus || d.status === disciplinasFiltroStatus;
+    const bateBusca = !termo || normalizarBusca(d.nome).includes(termo) || normalizarBusca(d.codigo).includes(termo);
+    return bateStatus && bateBusca;
+  });
+
+  const alvo = container.querySelector("#disc-conteudo");
+  if (!filtradas.length) {
+    alvo.innerHTML = `<p class="empty-state">Nenhuma matéria encontrada para esse filtro.</p>`;
+  } else if (disciplinasViewMode === "tabela") {
+    alvo.innerHTML = `<div class="scroll-x"><table class="data-table">
+      <thead><tr><th>Nome</th><th>Código</th><th>Período</th><th>Status</th><th>Média</th><th>Frequência</th></tr></thead>
+      <tbody>${filtradas.map((d) => `
+        <tr data-id="${d.id}" style="cursor:pointer;">
+          <td>${d.nome}</td>
+          <td>${d.codigo || "—"}</td>
+          <td>${d.periodo}º</td>
+          <td><span class="badge ${STATUS_DISC_BADGE[d.status] || ""}">${STATUS_DISC_LABEL[d.status] || d.status}</span></td>
+          <td>${d.media != null ? d.media.toFixed(1) : "—"}</td>
+          <td>${d.frequencia != null ? d.frequencia + "%" : "—"}</td>
+        </tr>`).join("")}</tbody>
+    </table></div>`;
+    alvo.querySelectorAll("tr[data-id]").forEach((row) => {
+      row.addEventListener("click", () => { location.hash = `#/disciplinas/${row.dataset.id}`; });
+    });
+  } else {
+    const porPeriodo = {};
+    filtradas.forEach((d) => { (porPeriodo[d.periodo] = porPeriodo[d.periodo] || []).push(d); });
+    const periodos = Object.keys(porPeriodo).map(Number).sort((a, b) => a - b);
+    alvo.innerHTML = periodos.map((p) => `
+      <div class="periodo-group">
+        <div class="periodo-group-label">${p}º período</div>
+        <div class="list">${porPeriodo[p].map(disciplinaRowHtml).join("")}</div>
+      </div>`).join("");
+    alvo.querySelectorAll(".list-row").forEach((row) => {
+      row.addEventListener("click", () => { location.hash = `#/disciplinas/${row.dataset.id}`; });
+    });
+  }
 
   container.querySelectorAll("[data-mode]").forEach((btn) => {
     btn.addEventListener("click", () => {
@@ -57,38 +109,33 @@ async function renderDisciplinasLista(container) {
       renderDisciplinasLista(container);
     });
   });
-  container.querySelectorAll("[data-ver]").forEach((btn) => {
-    btn.addEventListener("click", () => { location.hash = `#/disciplinas/${btn.dataset.ver}`; });
+  container.querySelectorAll("[data-status]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      disciplinasFiltroStatus = btn.dataset.status;
+      renderDisciplinasLista(container);
+    });
   });
-  container.querySelectorAll(".disciplina-card").forEach((card) => {
-    card.addEventListener("click", () => { location.hash = `#/disciplinas/${card.dataset.id}`; });
-  });
-  container.querySelector("#btn-nova-disciplina").addEventListener("click", () => abrirFormDisciplina());
+  const busca = container.querySelector("#busca-disciplina");
+  if (busca) {
+    busca.addEventListener("input", () => {
+      disciplinasBusca = busca.value;
+      renderDisciplinasConteudo(container, todasDisciplinas);
+    });
+  }
 }
 
-function disciplinaCardHtml(d) {
-  return `<div class="card disciplina-card" data-id="${d.id}" role="button" tabindex="0">
-    <div class="disciplina-top">
-      <span class="disciplina-dot" style="background:${d.cor || "#6366f1"}"></span>
-      <div>
-        <h3>${d.nome}</h3>
-        <div class="disciplina-meta">
-          <span>${d.periodo}º período</span>
-          <span class="badge ${STATUS_DISC_BADGE[d.status] || ""}">${STATUS_DISC_LABEL[d.status] || d.status}</span>
-        </div>
-      </div>
+function disciplinaRowHtml(d) {
+  return `<div class="list-row" data-id="${d.id}">
+    <span class="disciplina-row-color" style="background:${d.cor || "var(--text-faint)"}"></span>
+    <div class="list-row-main">
+      <div class="list-row-title">${d.nome}</div>
+      <div class="list-row-sub">${d.codigo || "Sem código"}${d.professor ? " · " + d.professor : ""}</div>
     </div>
-    <div class="disciplina-numeros">
-      <div><div class="num-label">Média</div><div class="num-value">${d.media != null ? d.media.toFixed(1) : "—"}</div></div>
-      <div><div class="num-label">Frequência</div><div class="num-value">${d.frequencia != null ? d.frequencia + "%" : "—"}</div></div>
+    <div class="list-row-meta">
+      <span class="badge ${STATUS_DISC_BADGE[d.status] || ""}">${STATUS_DISC_LABEL[d.status] || d.status}</span>
+      <span>${d.media != null ? d.media.toFixed(1) : "—"}</span>
     </div>
-    <div class="progress-bar"><span style="width:${d.progresso || 0}%"></span></div>
-    <div style="text-align:right;"><span class="btn btn-ghost btn-sm">Ver detalhes →</span></div>
   </div>`;
-}
-
-function emptyState(emoji, texto) {
-  return `<div class="empty-state"><span class="empty-emoji">${emoji}</span>${texto}</div>`;
 }
 
 /* ---------- Formulário criar/editar disciplina ---------- */
@@ -123,7 +170,7 @@ async function abrirFormDisciplina(disciplina = null) {
           <div class="field"><label for="f-media">Média</label><input id="f-media" type="number" step="0.1" min="0" max="10" value="${disciplina?.media ?? ""}"></div>
           <div class="field"><label for="f-frequencia">Frequência (%)</label><input id="f-frequencia" type="number" step="0.1" min="0" max="100" value="${disciplina?.frequencia ?? ""}"></div>
         </div>
-        <div class="field"><label for="f-cor">Cor</label><input id="f-cor" type="color" value="${disciplina?.cor || "#6366f1"}"></div>
+        <div class="field"><label for="f-cor">Cor de identificação</label><input id="f-cor" type="color" value="${disciplina?.cor || "#2563eb"}"></div>
         <div class="field"><label for="f-prereq">Pré-requisitos</label>
           <select id="f-prereq" multiple size="4">${opcoesPrereq}</select>
         </div>
@@ -185,14 +232,17 @@ async function renderDisciplinaDetail(container, id) {
   discTabAtiva = discTabAtiva || "Resumo";
 
   container.innerHTML = `
-    <button class="btn btn-ghost" id="btn-voltar">← Matérias</button>
-    <div class="section-title">
-      <h1>${d.nome}</h1>
-      <button class="btn btn-sm" id="btn-editar-disciplina">✏️ Editar</button>
+    <button class="btn btn-ghost btn-sm" id="btn-voltar">${icon("arrowLeft")} Matérias</button>
+    <div class="page-header" style="margin-top:var(--space-3);">
+      <div>
+        <h1>${d.nome}</h1>
+        <p class="page-subtitle" style="margin-bottom:0;">${d.codigo || "Sem código"} · ${d.periodo}º período</p>
+      </div>
+      <button class="btn btn-sm" id="btn-editar-disciplina">${icon("edit")} Editar</button>
     </div>
-    <div class="badge ${STATUS_DISC_BADGE[d.status] || ""}">${STATUS_DISC_LABEL[d.status] || d.status}</div>
+    <span class="badge ${STATUS_DISC_BADGE[d.status] || ""}" style="margin:var(--space-3) 0; display:inline-flex;">${STATUS_DISC_LABEL[d.status] || d.status}</span>
 
-    <div class="tabs" style="margin-top:16px;">
+    <div class="tabs">
       ${DISC_TABS.map((t) => `<button class="tab-btn ${t === discTabAtiva ? "active" : ""}" data-tab="${t}">${t}</button>`).join("")}
     </div>
 
@@ -219,11 +269,10 @@ async function renderDisciplinaDetail(container, id) {
 
 async function renderTabResumo(container, d) {
   const horarios = (d.horarios || []).map((h) => `${DIAS_SEMANA[h.dia_semana]} ${h.hora_inicio || ""}-${h.hora_fim || ""}`).join(", ") || "—";
-  const prereqs = (d.pre_requisitos || []).map((p) => `${p.nome} ${p.status === "concluida" ? "✅" : "⏳"}`).join(", ") || "Nenhum";
+  const prereqs = (d.pre_requisitos || []).map((p) => `${p.nome} (${p.status === "concluida" ? "concluída" : "pendente"})`).join(", ") || "Nenhum";
   container.innerHTML = `
-    <div class="card">
-      <dl style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin:0;">
-        ${infoRow("Código", d.codigo || "—")}
+    <div class="panel">
+      <dl style="display:grid; grid-template-columns: 1fr 1fr; gap:var(--space-4); margin:0;">
         ${infoRow("Professor", d.professor || "—")}
         ${infoRow("Carga horária", d.carga_horaria ? `${d.carga_horaria}h` : "—")}
         ${infoRow("Créditos", d.creditos ?? "—")}
@@ -231,18 +280,15 @@ async function renderTabResumo(container, d) {
         ${infoRow("Horário", horarios)}
         ${infoRow("Média", d.media != null ? d.media.toFixed(1) : "—")}
         ${infoRow("Frequência", d.frequencia != null ? d.frequencia + "%" : "—")}
+        ${infoRow("Pré-requisitos", prereqs)}
       </dl>
-      <div class="field" style="margin-top:14px;">
-        <label>Pré-requisitos</label>
-        <p>${prereqs}</p>
-      </div>
-      ${d.observacoes ? `<div class="field"><label>Observações</label><p>${d.observacoes}</p></div>` : ""}
+      ${d.observacoes ? `<div class="divider"></div><div><div class="list-row-sub" style="margin-bottom:4px;">Observações</div><p style="margin:0;">${d.observacoes}</p></div>` : ""}
     </div>
   `;
 }
 
 function infoRow(label, value) {
-  return `<div><div class="num-label">${label}</div><div style="font-weight:700;">${value}</div></div>`;
+  return `<div><div class="list-row-sub" style="margin-bottom:2px;">${label}</div><div style="font-weight:500;">${value}</div></div>`;
 }
 
 const DIAS_SEMANA = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
@@ -251,21 +297,25 @@ const DIAS_SEMANA = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 async function renderTabNotas(container, d) {
   const avaliacoes = await Api.listarAvaliacoes({ disciplina_id: d.id });
   container.innerHTML = `
-    <div class="card" style="margin-bottom:16px;">
-      <h3>Notas lançadas</h3>
+    <div class="section">
+      <div class="section-header"><h2>Notas lançadas</h2></div>
       ${avaliacoes.length ? `<table class="data-table"><thead><tr><th>Avaliação</th><th>Peso</th><th>Nota</th></tr></thead>
         <tbody>${avaliacoes.map((a) => `<tr><td>${a.titulo}</td><td>${a.peso}</td><td>${a.nota ?? "—"}</td></tr>`).join("")}</tbody></table>`
-        : emptyState("📝", "Nenhuma avaliação com nota lançada ainda.")}
-      <p style="margin-top:12px;">Média atual: <strong>${d.media != null ? d.media.toFixed(2) : "—"}</strong></p>
+        : `<p class="empty-state">Nenhuma avaliação com nota lançada ainda.</p>`}
+      <p style="margin-top:var(--space-3);">Média atual: <strong>${d.media != null ? d.media.toFixed(2) : "—"}</strong></p>
     </div>
 
-    <div class="card">
-      <h3>🎯 Quanto preciso tirar?</h3>
-      <p class="foco-sub">Informe a média desejada e a nota que falta lançar para calcular o necessário na próxima avaliação pendente.</p>
-      <div class="field"><label for="fn-meta">Média desejada</label><input id="fn-meta" type="number" step="0.1" min="0" max="10" value="7"></div>
-      <div class="field"><label for="fn-peso-restante">Peso da(s) avaliação(ões) que faltam</label><input id="fn-peso-restante" type="number" step="0.1" value="${somaPesoPendente(avaliacoes) || 1}"></div>
-      <button class="btn btn-primary btn-block" id="btn-calcular-nota">Calcular</button>
-      <div id="resultado-nota" style="margin-top:14px;"></div>
+    <div class="section">
+      <div class="section-header"><h2>Quanto preciso tirar?</h2></div>
+      <div class="panel">
+        <p class="field-hint" style="margin-top:0;">Informe a média desejada e o peso das avaliações que faltam para calcular a nota necessária.</p>
+        <div class="field-row">
+          <div class="field"><label for="fn-meta">Média desejada</label><input id="fn-meta" type="number" step="0.1" min="0" max="10" value="7"></div>
+          <div class="field"><label for="fn-peso-restante">Peso restante</label><input id="fn-peso-restante" type="number" step="0.1" value="${somaPesoPendente(avaliacoes) || 1}"></div>
+        </div>
+        <button class="btn btn-primary" id="btn-calcular-nota">Calcular</button>
+        <div id="resultado-nota" style="margin-top:var(--space-4);"></div>
+      </div>
     </div>
   `;
 
@@ -278,15 +328,15 @@ async function renderTabNotas(container, d) {
     const pesoTotal = pesoLancado + pesoRestante;
     const resultado = document.getElementById("resultado-nota");
     if (pesoRestante <= 0 || pesoTotal <= 0) {
-      resultado.innerHTML = `<div class="empty-state">Adicione um peso válido para a(s) avaliação(ões) restante(s).</div>`;
+      resultado.innerHTML = `<p class="empty-state">Adicione um peso válido para a(s) avaliação(ões) restante(s).</p>`;
       return;
     }
     const necessario = (metaDesejada * pesoTotal - somaLancada) / pesoRestante;
     const atingivel = necessario <= 10;
     resultado.innerHTML = `<div class="notas-result">
-      <div class="foco-sub">Para terminar com ${metaDesejada.toFixed(1)}, você precisa tirar:</div>
+      <div class="field-hint">Para terminar com ${metaDesejada.toFixed(1)}, você precisa tirar:</div>
       <div class="notas-big" style="color:${atingivel ? "var(--success)" : "var(--danger)"}">${necessario.toFixed(1)}</div>
-      ${!atingivel ? `<div class="foco-sub">Não é matematicamente possível com o peso informado.</div>` : ""}
+      ${!atingivel ? `<div class="field-hint">Não é matematicamente possível com o peso informado.</div>` : ""}
     </div>`;
   });
 }
@@ -301,18 +351,18 @@ const STATUS_CONTEUDO_LABEL = { pendente: "Pendente", andamento: "Em andamento",
 async function renderTabConteudos(container, d) {
   const conteudos = await Api.listarConteudos({ disciplina_id: d.id });
   container.innerHTML = `
-    <button class="btn btn-primary btn-block" id="btn-novo-conteudo" style="margin-bottom:14px;">+ Novo conteúdo</button>
-    ${conteudos.length ? `<div class="card" style="padding:4px 16px;">
+    <div class="page-header"><h2>Conteúdo programático</h2><button class="btn btn-sm" id="btn-novo-conteudo">${icon("plus")} Novo</button></div>
+    ${conteudos.length ? `<div class="list">
       ${conteudos.map((c) => `
-        <div class="agenda-item" style="align-items:center;">
-          <input type="checkbox" data-conteudo="${c.id}" ${c.status === "concluido" ? "checked" : ""} style="width:22px;height:22px;">
-          <div style="flex:1;">
-            <div style="font-weight:600; ${c.status === "concluido" ? "text-decoration:line-through; color:var(--text-muted);" : ""}">${c.titulo}</div>
-            <div class="foco-sub">${STATUS_CONTEUDO_LABEL[c.status]}</div>
+        <div class="list-row" style="cursor:default;">
+          <input type="checkbox" class="list-row-checkbox" data-conteudo="${c.id}" ${c.status === "concluido" ? "checked" : ""}>
+          <div class="list-row-main">
+            <div class="list-row-title" style="${c.status === "concluido" ? "text-decoration:line-through; color:var(--text-muted);" : ""}">${c.titulo}</div>
+            <div class="list-row-sub">${STATUS_CONTEUDO_LABEL[c.status]}</div>
           </div>
-          <button class="btn btn-sm" data-editar-conteudo="${c.id}">✏️</button>
+          <button class="icon-btn" data-editar-conteudo="${c.id}" aria-label="Editar conteúdo">${icon("edit")}</button>
         </div>`).join("")}
-    </div>` : emptyState("📖", "Nenhum conteúdo cadastrado.")}
+    </div>` : `<p class="empty-state">Nenhum conteúdo cadastrado.</p>`}
   `;
 
   container.querySelector("#btn-novo-conteudo").addEventListener("click", () => abrirFormConteudo(d.id));
@@ -387,12 +437,12 @@ function abrirFormConteudo(disciplinaId, conteudo = null) {
 async function renderTabAvaliacoesDisciplina(container, d) {
   const avaliacoes = await Api.listarAvaliacoes({ disciplina_id: d.id });
   container.innerHTML = `
-    <button class="btn btn-primary btn-block" id="btn-nova-aval-disc" style="margin-bottom:14px;">+ Nova avaliação</button>
-    <div class="cards-grid">${avaliacoes.length ? avaliacoes.map((a) => avaliacaoCardHtml(a)).join("") : emptyState("📝", "Nenhuma avaliação cadastrada.")}</div>
+    <div class="page-header"><h2>Avaliações</h2><button class="btn btn-sm" id="btn-nova-aval-disc">${icon("plus")} Nova</button></div>
+    <div class="list">${avaliacoes.length ? avaliacoes.map((a) => avaliacaoRowHtml(a)).join("") : `<p class="empty-state">Nenhuma avaliação cadastrada.</p>`}</div>
   `;
   container.querySelector("#btn-nova-aval-disc").addEventListener("click", () => abrirFormAvaliacao(null, d.id));
-  container.querySelectorAll(".aval-card").forEach((card) => card.addEventListener("click", () => {
-    const a = avaliacoes.find((x) => String(x.id) === card.dataset.id);
+  container.querySelectorAll(".list-row[data-id]").forEach((row) => row.addEventListener("click", () => {
+    const a = avaliacoes.find((x) => String(x.id) === row.dataset.id);
     abrirFormAvaliacao(a);
   }));
 }
@@ -401,12 +451,12 @@ async function renderTabAvaliacoesDisciplina(container, d) {
 async function renderTabTarefasDisciplina(container, d) {
   const tarefas = await Api.listarTarefas({ disciplina_id: d.id });
   container.innerHTML = `
-    <button class="btn btn-primary btn-block" id="btn-nova-tarefa-disc" style="margin-bottom:14px;">+ Nova tarefa</button>
-    <div class="cards-grid">${tarefas.length ? tarefas.map((t) => tarefaCardHtml(t)).join("") : emptyState("✅", "Nenhuma tarefa cadastrada.")}</div>
+    <div class="page-header"><h2>Tarefas</h2><button class="btn btn-sm" id="btn-nova-tarefa-disc">${icon("plus")} Nova</button></div>
+    <div class="list">${tarefas.length ? tarefas.map((t) => tarefaRowHtml(t)).join("") : `<p class="empty-state">Nenhuma tarefa cadastrada.</p>`}</div>
   `;
   container.querySelector("#btn-nova-tarefa-disc").addEventListener("click", () => abrirFormTarefa(null, d.id));
-  container.querySelectorAll(".tarefa-card").forEach((card) => card.addEventListener("click", () => {
-    const t = tarefas.find((x) => String(x.id) === card.dataset.id);
+  container.querySelectorAll(".list-row[data-id]").forEach((row) => row.addEventListener("click", () => {
+    const t = tarefas.find((x) => String(x.id) === row.dataset.id);
     abrirFormTarefa(t);
   }));
 }
@@ -416,21 +466,20 @@ async function renderTabEstudosDisciplina(container, d) {
   const sessoes = await Api.listarEstudos({ disciplina_id: d.id });
   const totalMin = sessoes.reduce((s, x) => s + x.duracao_min, 0);
   container.innerHTML = `
-    <div class="card" style="margin-bottom:14px;">
-      <div class="num-label">Total estudado nesta matéria</div>
-      <div class="num-value" style="font-size:24px;">${(totalMin / 60).toFixed(1)}h</div>
+    <div class="stat-line" style="margin-bottom:var(--space-4);">
+      <div class="stat-item"><span class="stat-value">${(totalMin / 60).toFixed(1)}h</span><span class="stat-label">estudadas nesta matéria</span></div>
     </div>
-    <button class="btn btn-primary btn-block" id="btn-novo-estudo-disc" style="margin-bottom:14px;">+ Registrar sessão de estudo</button>
-    ${sessoes.length ? `<div class="card" style="padding:4px 16px;">
+    <div class="page-header"><h2>Sessões</h2><button class="btn btn-sm" id="btn-novo-estudo-disc">${icon("plus")} Registrar</button></div>
+    ${sessoes.length ? `<div class="list">
       ${sessoes.map((s) => `
-        <div class="agenda-item">
-          <div class="agenda-time">${formatarData(s.data)}</div>
-          <div style="flex:1;">
-            <div style="font-weight:600;">${s.tipo}</div>
-            <div class="foco-sub">${s.duracao_min} min ${s.observacoes ? "· " + s.observacoes : ""}</div>
+        <div class="list-row" style="cursor:default;">
+          <div class="list-row-main">
+            <div class="list-row-title">${s.tipo}</div>
+            <div class="list-row-sub">${s.observacoes || ""}</div>
           </div>
+          <div class="list-row-meta">${formatarData(s.data)} · ${s.duracao_min} min</div>
         </div>`).join("")}
-    </div>` : emptyState("🎯", "Nenhuma sessão de estudo registrada.")}
+    </div>` : `<p class="empty-state">Nenhuma sessão de estudo registrada.</p>`}
   `;
   container.querySelector("#btn-novo-estudo-disc").addEventListener("click", () => abrirFormEstudo(d.id));
 }
